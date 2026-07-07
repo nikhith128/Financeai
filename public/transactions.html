@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FinanceAI - Transactions Ledger</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    background: #f2f2f2;
+    color: #1a1a1a;
+    padding: 16px;
+  }
+  .app { max-width: 1100px; margin: 0 auto; }
+
+  nav.topnav { display: flex; gap: 14px; margin-bottom: 14px; font-size: 13px; }
+  nav.topnav a { color: #1a1a1a; text-decoration: none; border-bottom: 2px solid transparent; padding-bottom: 2px; }
+  nav.topnav a.active { border-bottom-color: #1a1a1a; font-weight: bold; }
+  nav.topnav span.future { color: #999; }
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  header h1 { font-size: 20px; }
+
+  button {
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 14px;
+    padding: 8px 14px;
+    border: 1px solid #333;
+    background: #fff;
+    color: #1a1a1a;
+    border-radius: 4px;
+  }
+  button:hover { background: #eee; }
+  button.primary { background: #1a1a1a; color: #fff; }
+  button.primary:hover { background: #333; }
+
+  /* Filter bar */
+  .filter-bar {
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 14px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: flex-end;
+  }
+  .filter-field { display: flex; flex-direction: column; gap: 3px; }
+  .filter-field label { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.02em; }
+  .filter-field input, .filter-field select {
+    padding: 7px; font-size: 13px; border: 1px solid #ccc; border-radius: 4px; min-width: 140px;
+  }
+  .filter-field.search input { min-width: 200px; }
+
+  .type-tabs { display: flex; gap: 4px; }
+  .type-tabs button { padding: 6px 10px; font-size: 12px; }
+  .type-tabs button.active { background: #1a1a1a; color: #fff; }
+
+  .filter-clear { margin-left: auto; }
+
+  /* Table */
+  .ledger-panel {
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .ledger-header-row, .ledger-row {
+    display: grid;
+    grid-template-columns: 110px 1fr 120px 110px 110px 70px;
+    gap: 8px;
+    align-items: center;
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+  .ledger-header-row {
+    background: #fafafa;
+    border-bottom: 1px solid #ddd;
+    font-size: 11px;
+    text-transform: uppercase;
+    color: #666;
+    letter-spacing: 0.02em;
+  }
+  .ledger-row { border-bottom: 1px solid #eee; }
+  .ledger-row:last-child { border-bottom: none; }
+  .ledger-row:hover { background: #fafafa; }
+
+  .desc-cell .name { font-weight: bold; }
+  .desc-cell .date { font-size: 11px; color: #888; }
+  .account-badge {
+    display: inline-block; font-size: 11px; background: #eee; border-radius: 10px;
+    padding: 2px 8px;
+  }
+  .amount-cell { font-weight: bold; text-align: right; }
+  .amount-cell.income { color: #1b7a3d; }
+  .amount-cell.expense { color: #b3261e; }
+  .amount-cell.transfer { color: #555; }
+  .row-actions { display: flex; gap: 4px; justify-content: flex-end; }
+  .row-actions button { padding: 3px 6px; font-size: 12px; border: none; background: none; }
+
+  .empty-state { padding: 30px 14px; text-align: center; color: #888; font-size: 13px; }
+
+  .pagination {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 14px; font-size: 12px; color: #555; background: #fafafa;
+  }
+  .pagination .controls { display: flex; gap: 6px; }
+  .pagination button { padding: 4px 10px; font-size: 12px; }
+
+  /* Modal (same pattern as dashboard) */
+  .modal-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.4);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100;
+  }
+  .modal-overlay.hidden { display: none; }
+  .modal {
+    background: #fff; border-radius: 6px; padding: 18px;
+    width: 100%; max-width: 380px; max-height: 90vh; overflow-y: auto;
+  }
+  .modal h2 { font-size: 16px; margin-bottom: 12px; }
+  .type-toggle { display: flex; gap: 6px; margin-bottom: 12px; }
+  .type-toggle button { flex: 1; }
+  .type-toggle button.active { background: #1a1a1a; color: #fff; }
+  .form-group { margin-bottom: 10px; }
+  .form-group label { display: block; font-size: 12px; color: #555; margin-bottom: 3px; }
+  .form-group input, .form-group select { width: 100%; padding: 7px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+  .error-msg { color: #b3261e; font-size: 12px; margin-top: 4px; display: none; }
+  .hidden { display: none; }
+
+  @media (max-width: 800px) {
+    .ledger-header-row { display: none; }
+    .ledger-row {
+      grid-template-columns: 1fr;
+      gap: 4px;
+      padding: 12px 14px;
+      position: relative;
+    }
+    .ledger-row .icon-cell { display: none; }
+    .ledger-row .amount-cell { text-align: left; }
+    .ledger-row .row-actions { position: absolute; top: 10px; right: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <nav class="topnav">
+    <a href="dashboard.html">Dashboard</a>
+    <a href="transactions.html" class="active">Transactions</a>
+    <a href="budgets.html">Budgets &amp; Goals</a>
+    <a href="analytics.html">Analytics</a>
+  </nav>
+
+  <header>
+    <h1>Transactions Ledger</h1>
+    <button class="primary" id="btnAddNew">+ Add New</button>
+  </header>
+
+  <div class="filter-bar">
+    <div class="filter-field search">
+      <label for="searchInput">Search</label>
+      <input type="text" id="searchInput" placeholder="Merchant, note, or amount...">
+    </div>
+
+    <div class="filter-field">
+      <label for="dateRangeSelect">Date Range</label>
+      <select id="dateRangeSelect">
+        <option value="all">All Time</option>
+        <option value="this-month" selected>This Month</option>
+        <option value="last-30">Last 30 Days</option>
+        <option value="this-year">This Year</option>
+        <option value="custom">Custom Range</option>
+      </select>
+    </div>
+
+    <div class="filter-field hidden" id="customStartGroup">
+      <label for="customStart">From</label>
+      <input type="date" id="customStart">
+    </div>
+    <div class="filter-field hidden" id="customEndGroup">
+      <label for="customEnd">To</label>
+      <input type="date" id="customEnd">
+    </div>
+
+    <div class="filter-field">
+      <label for="categorySelect">Category</label>
+      <select id="categorySelect"><option value="all">All Categories</option></select>
+    </div>
+
+    <div class="filter-field">
+      <label for="accountSelect">Account</label>
+      <select id="accountSelect"><option value="all">All Accounts</option></select>
+    </div>
+
+    <div class="filter-field">
+      <label>Type</label>
+      <div class="type-tabs" id="typeTabs">
+        <button type="button" data-type="all" class="active">All</button>
+        <button type="button" data-type="expense">Expenses</button>
+        <button type="button" data-type="income">Income</button>
+        <button type="button" data-type="transfer">Transfers</button>
+      </div>
+    </div>
+
+    <button class="filter-clear" id="btnClearFilters">Clear Filters</button>
+  </div>
+
+  <div class="ledger-panel">
+    <div class="ledger-header-row">
+      <div>Date</div>
+      <div>Description</div>
+      <div>Account</div>
+      <div style="text-align:right;">Amount</div>
+      <div></div>
+      <div></div>
+    </div>
+    <div id="ledgerBody"></div>
+    <div class="pagination">
+      <div id="paginationLabel">Showing 0 of 0</div>
+      <div class="controls">
+        <button id="btnPrevPage">Prev</button>
+        <button id="btnNextPage">Next</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Add/Edit Transaction Modal -->
+<div class="modal-overlay hidden" id="modalOverlay">
+  <div class="modal">
+    <h2 id="modalTitle">Add Transaction</h2>
+    <div class="type-toggle" id="modalTypeToggle">
+      <button type="button" data-type="expense" class="active">Expense</button>
+      <button type="button" data-type="income">Income</button>
+      <button type="button" data-type="transfer">Transfer</button>
+    </div>
+    <form id="txForm">
+      <input type="hidden" id="editingId" value="">
+
+      <div class="form-group">
+        <label for="amountInput">Amount (₹)</label>
+        <input type="number" id="amountInput" min="0.01" step="0.01" required>
+      </div>
+
+      <div class="form-group">
+        <label for="dateInput">Date &amp; Time</label>
+        <input type="datetime-local" id="dateInput" required>
+      </div>
+
+      <div class="form-group" id="categoryGroup">
+        <label for="categoryInput">Category</label>
+        <select id="categoryInput"></select>
+      </div>
+
+      <div class="form-group" id="accountGroup">
+        <label for="accountInput" id="accountLabel">Account</label>
+        <select id="accountInput"></select>
+      </div>
+
+      <div class="form-group hidden" id="toAccountGroup">
+        <label for="toAccountInput">To Account</label>
+        <select id="toAccountInput"></select>
+      </div>
+
+      <div class="form-group">
+        <label for="noteInput">Notes / Tags (optional)</label>
+        <input type="text" id="noteInput" placeholder="e.g. Dinner with team #birthday">
+      </div>
+
+      <div class="error-msg" id="formError"></div>
+
+      <div class="modal-actions">
+        <button type="button" id="btnCancelModal">Cancel</button>
+        <button type="submit" class="primary" id="btnSubmitModal">Save Transaction</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- Shared constants (must match dashboard.html) ----------
+  var EXPENSE_CATEGORIES = ["Food", "Rent", "Transport", "Entertainment", "Utilities", "Shopping", "Health", "Other"];
+  var INCOME_CATEGORIES = ["Salary", "Freelance", "Investment", "Other Income"];
+  var ACCOUNTS = ["Cash", "Bank", "Credit Card"];
+  var CATEGORY_ICONS = {
+    "Food": "🍔", "Rent": "🏠", "Transport": "🚗", "Entertainment": "🍿",
+    "Utilities": "⚡", "Shopping": "🛍️", "Health": "💊", "Other": "💰",
+    "Salary": "💼", "Freelance": "🧑‍💻", "Investment": "📈", "Other Income": "💰"
+  };
+  var PAGE_SIZE = 8;
+
+  // ---------- API helpers (Express + JSON backend) ----------
+  var API_BASE = "/api";
+
+  async function apiGet(path) {
+    var res = await fetch(API_BASE + path);
+    if (!res.ok) throw new Error("GET " + path + " failed: " + res.status);
+    return res.json();
+  }
+  async function apiPost(path, body) {
+    var res = await fetch(API_BASE + path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) throw new Error("POST " + path + " failed: " + res.status);
+    return res.json();
+  }
+  async function apiPut(path, body) {
+    var res = await fetch(API_BASE + path, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) throw new Error("PUT " + path + " failed: " + res.status);
+    return res.json();
+  }
+  async function apiDelete(path) {
+    var res = await fetch(API_BASE + path, { method: "DELETE" });
+    if (!res.ok) throw new Error("DELETE " + path + " failed: " + res.status);
+  }
+
+  function fetchTransactions() { return apiGet("/transactions"); }
+  function createTransaction(tx) { return apiPost("/transactions", tx); }
+  function updateTransactionApi(id, tx) { return apiPut("/transactions/" + id, tx); }
+  function deleteTransactionApi(id) { return apiDelete("/transactions/" + id); }
+
+  // Cached copy of the last-loaded transactions; filtering/pagination work off
+  // this cache, and it's refreshed with a real fetch after any mutation.
+  var cachedTransactions = [];
+  async function refreshTransactions() {
+    cachedTransactions = await fetchTransactions();
+  }
+
+  // ---------- Date/format helpers ----------
+  function formatDateForInput(date) {
+    var pad = function (n) { return String(n).padStart(2, "0"); };
+    return date.getFullYear() + "-" + pad(date.getMonth() + 1) + "-" + pad(date.getDate()) +
+      "T" + pad(date.getHours()) + ":" + pad(date.getMinutes());
+  }
+  function formatDisplayDate(dateStr) {
+    var d = new Date(dateStr);
+    return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" }) + ", " +
+      d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+  }
+  function formatCurrency(n) {
+    return "₹" + Math.round(n).toLocaleString("en-IN");
+  }
+
+  // ---------- Filter state ----------
+  var state = {
+    search: "",
+    dateRange: "this-month",
+    customStart: null,
+    customEnd: null,
+    type: "all",
+    category: "all",
+    account: "all",
+    page: 1
+  };
+
+  // ---------- Populate filter dropdowns ----------
+  var categorySelect = document.getElementById("categorySelect");
+  var allCategories = EXPENSE_CATEGORIES.concat(INCOME_CATEGORIES);
+  allCategories.forEach(function (cat) {
+    var opt = document.createElement("option");
+    opt.value = cat;
+    opt.textContent = cat;
+    categorySelect.appendChild(opt);
+  });
+
+  var accountSelect = document.getElementById("accountSelect");
+  ACCOUNTS.forEach(function (acc) {
+    var opt = document.createElement("option");
+    opt.value = acc;
+    opt.textContent = acc;
+    accountSelect.appendChild(opt);
+  });
+
+  // ---------- Date range resolution ----------
+  function getDateBounds() {
+    var now = new Date();
+    var start = null, end = null;
+
+    if (state.dateRange === "this-month") {
+      start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+      end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    } else if (state.dateRange === "last-30") {
+      end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+      start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    } else if (state.dateRange === "this-year") {
+      start = new Date(now.getFullYear(), 0, 1, 0, 0, 0);
+      end = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
+    } else if (state.dateRange === "custom") {
+      start = state.customStart ? new Date(state.customStart + "T00:00:00") : null;
+      end = state.customEnd ? new Date(state.customEnd + "T23:59:59") : null;
+    }
+    // "all" -> start/end stay null (no bound)
+    return { start: start, end: end };
+  }
+
+  // ---------- Filtering ----------
+  function getFilteredTransactions() {
+    var transactions = cachedTransactions;
+    var bounds = getDateBounds();
+    var searchLower = state.search.trim().toLowerCase();
+
+    return transactions.filter(function (tx) {
+      if (state.type !== "all" && tx.type !== state.type) return false;
+
+      if (state.category !== "all") {
+        if (tx.type === "transfer" || tx.category !== state.category) return false;
+      }
+
+      if (state.account !== "all") {
+        var accountMatches = tx.account === state.account ||
+          (tx.type === "transfer" && tx.toAccount === state.account);
+        if (!accountMatches) return false;
+      }
+
+      var txDate = new Date(tx.date);
+      if (bounds.start && txDate < bounds.start) return false;
+      if (bounds.end && txDate > bounds.end) return false;
+
+      if (searchLower) {
+        var haystack = [
+          tx.category || "",
+          tx.note || "",
+          tx.account || "",
+          tx.toAccount || "",
+          String(tx.amount)
+        ].join(" ").toLowerCase();
+        if (haystack.indexOf(searchLower) === -1) return false;
+      }
+
+      return true;
+    }).sort(function (a, b) { return new Date(b.date) - new Date(a.date); });
+  }
+
+  // ---------- Rendering ----------
+  function renderLedger() {
+    var filtered = getFilteredTransactions();
+    var totalCount = filtered.length;
+    var totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+    if (state.page > totalPages) state.page = totalPages;
+
+    var startIdx = (state.page - 1) * PAGE_SIZE;
+    var pageItems = filtered.slice(startIdx, startIdx + PAGE_SIZE);
+
+    var body = document.getElementById("ledgerBody");
+    body.innerHTML = "";
+
+    if (totalCount === 0) {
+      body.innerHTML = '<div class="empty-state">No transactions match these filters.</div>';
+    } else {
+      pageItems.forEach(function (tx) {
+        var row = document.createElement("div");
+        row.className = "ledger-row";
+
+        var icon, name, amountClass, amountLabel;
+        if (tx.type === "transfer") {
+          icon = "🔄";
+          name = "Transfer to " + tx.toAccount;
+          amountClass = "transfer";
+          amountLabel = formatCurrency(tx.amount);
+        } else {
+          icon = CATEGORY_ICONS[tx.category] || "💰";
+          name = tx.note ? tx.note : tx.category;
+          amountClass = tx.type === "income" ? "income" : "expense";
+          amountLabel = (tx.type === "income" ? "+" : "-") + formatCurrency(tx.amount);
+        }
+
+        row.innerHTML =
+          '<div class="icon-cell">' + icon + '</div>' +
+          '<div class="desc-cell"><div class="name">' + name + '</div>' +
+            '<div class="date">' + formatDisplayDate(tx.date) + '</div></div>' +
+          '<div><span class="account-badge">' + tx.account + '</span></div>' +
+          '<div class="amount-cell ' + amountClass + '">' + amountLabel + '</div>' +
+          '<div></div>' +
+          '<div class="row-actions">' +
+            '<button data-action="edit" data-id="' + tx.id + '" title="Edit">✏️</button>' +
+            '<button data-action="delete" data-id="' + tx.id + '" title="Delete">🗑️</button>' +
+          '</div>';
+
+        body.appendChild(row);
+      });
+    }
+
+    var rangeStart = totalCount === 0 ? 0 : startIdx + 1;
+    var rangeEnd = Math.min(startIdx + PAGE_SIZE, totalCount);
+    document.getElementById("paginationLabel").textContent =
+      "Showing " + rangeStart + "-" + rangeEnd + " of " + totalCount;
+    document.getElementById("btnPrevPage").disabled = state.page <= 1;
+    document.getElementById("btnNextPage").disabled = state.page >= totalPages;
+  }
+
+  // ---------- Filter event wiring ----------
+  document.getElementById("searchInput").addEventListener("input", function (e) {
+    state.search = e.target.value;
+    state.page = 1;
+    renderLedger();
+  });
+
+  document.getElementById("dateRangeSelect").addEventListener("change", function (e) {
+    state.dateRange = e.target.value;
+    state.page = 1;
+    var isCustom = state.dateRange === "custom";
+    document.getElementById("customStartGroup").classList.toggle("hidden", !isCustom);
+    document.getElementById("customEndGroup").classList.toggle("hidden", !isCustom);
+    renderLedger();
+  });
+
+  document.getElementById("customStart").addEventListener("change", function (e) {
+    state.customStart = e.target.value;
+    state.page = 1;
+    renderLedger();
+  });
+  document.getElementById("customEnd").addEventListener("change", function (e) {
+    state.customEnd = e.target.value;
+    state.page = 1;
+    renderLedger();
+  });
+
+  document.getElementById("categorySelect").addEventListener("change", function (e) {
+    state.category = e.target.value;
+    state.page = 1;
+    renderLedger();
+  });
+  document.getElementById("accountSelect").addEventListener("change", function (e) {
+    state.account = e.target.value;
+    state.page = 1;
+    renderLedger();
+  });
+
+  document.getElementById("typeTabs").addEventListener("click", function (e) {
+    var btn = e.target.closest("button[data-type]");
+    if (!btn) return;
+    state.type = btn.getAttribute("data-type");
+    state.page = 1;
+    Array.prototype.forEach.call(document.getElementById("typeTabs").children, function (b) {
+      b.classList.toggle("active", b === btn);
+    });
+    renderLedger();
+  });
+
+  document.getElementById("btnClearFilters").addEventListener("click", function () {
+    state = { search: "", dateRange: "all", customStart: null, customEnd: null, type: "all", category: "all", account: "all", page: 1 };
+    document.getElementById("searchInput").value = "";
+    document.getElementById("dateRangeSelect").value = "all";
+    document.getElementById("customStartGroup").classList.add("hidden");
+    document.getElementById("customEndGroup").classList.add("hidden");
+    document.getElementById("categorySelect").value = "all";
+    document.getElementById("accountSelect").value = "all";
+    Array.prototype.forEach.call(document.getElementById("typeTabs").children, function (b, i) {
+      b.classList.toggle("active", i === 0);
+    });
+    renderLedger();
+  });
+
+  document.getElementById("btnPrevPage").addEventListener("click", function () {
+    if (state.page > 1) { state.page -= 1; renderLedger(); }
+  });
+  document.getElementById("btnNextPage").addEventListener("click", function () {
+    state.page += 1; renderLedger();
+  });
+
+  // ---------- Modal logic (shared pattern with dashboard.html) ----------
+  var modalOverlay = document.getElementById("modalOverlay");
+  var modalTitle = document.getElementById("modalTitle");
+  var modalTypeToggle = document.getElementById("modalTypeToggle");
+  var txForm = document.getElementById("txForm");
+  var editingIdInput = document.getElementById("editingId");
+  var amountInput = document.getElementById("amountInput");
+  var dateInput = document.getElementById("dateInput");
+  var categoryGroup = document.getElementById("categoryGroup");
+  var categoryInput = document.getElementById("categoryInput");
+  var accountLabel = document.getElementById("accountLabel");
+  var accountInput = document.getElementById("accountInput");
+  var toAccountGroup = document.getElementById("toAccountGroup");
+  var toAccountInput = document.getElementById("toAccountInput");
+  var noteInput = document.getElementById("noteInput");
+  var formError = document.getElementById("formError");
+  var currentType = "expense";
+
+  function populateSelect(select, options) {
+    select.innerHTML = "";
+    options.forEach(function (opt) {
+      var el = document.createElement("option");
+      el.value = opt;
+      el.textContent = opt;
+      select.appendChild(el);
+    });
+  }
+  populateSelect(accountInput, ACCOUNTS);
+  populateSelect(toAccountInput, ACCOUNTS);
+
+  function setType(type) {
+    currentType = type;
+    Array.prototype.forEach.call(modalTypeToggle.children, function (btn) {
+      btn.classList.toggle("active", btn.getAttribute("data-type") === type);
+    });
+    if (type === "transfer") {
+      categoryGroup.classList.add("hidden");
+      toAccountGroup.classList.remove("hidden");
+      accountLabel.textContent = "From Account";
+    } else {
+      categoryGroup.classList.remove("hidden");
+      toAccountGroup.classList.add("hidden");
+      accountLabel.textContent = "Account";
+      populateSelect(categoryInput, type === "expense" ? EXPENSE_CATEGORIES : INCOME_CATEGORIES);
+    }
+  }
+
+  modalTypeToggle.addEventListener("click", function (e) {
+    var btn = e.target.closest("button[data-type]");
+    if (!btn) return;
+    setType(btn.getAttribute("data-type"));
+  });
+
+  function openModal(presetType, existingTx) {
+    formError.style.display = "none";
+    txForm.reset();
+    editingIdInput.value = "";
+
+    if (existingTx) {
+      modalTitle.textContent = "Edit Transaction";
+      editingIdInput.value = existingTx.id;
+      setType(existingTx.type);
+      amountInput.value = existingTx.amount;
+      dateInput.value = formatDateForInput(new Date(existingTx.date));
+      accountInput.value = existingTx.account;
+      if (existingTx.type === "transfer") {
+        toAccountInput.value = existingTx.toAccount;
+      } else {
+        categoryInput.value = existingTx.category;
+      }
+      noteInput.value = existingTx.note || "";
+    } else {
+      modalTitle.textContent = "Add Transaction";
+      setType(presetType || "expense");
+      dateInput.value = formatDateForInput(new Date());
+    }
+    modalOverlay.classList.remove("hidden");
+  }
+  function closeModal() { modalOverlay.classList.add("hidden"); }
+
+  document.getElementById("btnAddNew").addEventListener("click", function () { openModal("expense"); });
+  document.getElementById("btnCancelModal").addEventListener("click", closeModal);
+  modalOverlay.addEventListener("click", function (e) { if (e.target === modalOverlay) closeModal(); });
+
+  txForm.addEventListener("submit", async function (e) {
+    e.preventDefault();
+    formError.style.display = "none";
+
+    var amount = parseFloat(amountInput.value);
+    if (!amount || amount <= 0) {
+      formError.textContent = "Enter a valid amount greater than 0.";
+      formError.style.display = "block";
+      return;
+    }
+    if (!dateInput.value) {
+      formError.textContent = "Select a date and time.";
+      formError.style.display = "block";
+      return;
+    }
+    if (currentType === "transfer" && accountInput.value === toAccountInput.value) {
+      formError.textContent = "From Account and To Account must be different.";
+      formError.style.display = "block";
+      return;
+    }
+
+    var isoDate = new Date(dateInput.value).toISOString();
+    var editingId = editingIdInput.value;
+
+    var txObject = {
+      type: currentType,
+      amount: amount,
+      date: isoDate,
+      account: accountInput.value,
+      note: noteInput.value.trim()
+    };
+    if (currentType === "transfer") {
+      txObject.toAccount = toAccountInput.value;
+      txObject.category = null;
+    } else {
+      txObject.category = categoryInput.value;
+    }
+
+    try {
+      if (editingId) {
+        await updateTransactionApi(editingId, txObject);
+      } else {
+        await createTransaction(txObject);
+      }
+      closeModal();
+      await refreshTransactions();
+      renderLedger();
+    } catch (err) {
+      formError.textContent = "Couldn't save the transaction. Is the FinanceAI server running?";
+      formError.style.display = "block";
+      console.error(err);
+    }
+  });
+
+  document.getElementById("ledgerBody").addEventListener("click", async function (e) {
+    var btn = e.target.closest("button[data-action]");
+    if (!btn) return;
+    var id = btn.getAttribute("data-id");
+    var action = btn.getAttribute("data-action");
+    var tx = cachedTransactions.find(function (t) { return t.id === id; });
+    if (!tx) return;
+
+    if (action === "edit") {
+      openModal(tx.type, tx);
+    } else if (action === "delete") {
+      if (confirm("Delete this transaction? This cannot be undone.")) {
+        try {
+          await deleteTransactionApi(id);
+          await refreshTransactions();
+          renderLedger();
+        } catch (err) {
+          alert("Couldn't delete the transaction. Is the FinanceAI server running?");
+          console.error(err);
+        }
+      }
+    }
+  });
+
+  // ---------- Init ----------
+  refreshTransactions().then(renderLedger);
+})();
+</script>
+</body>
+</html>

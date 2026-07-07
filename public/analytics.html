@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FinanceAI - Analytics & Insights</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    background: #f2f2f2;
+    color: #1a1a1a;
+    padding: 16px;
+  }
+  .app { max-width: 1100px; margin: 0 auto; }
+
+  nav.topnav { display: flex; gap: 14px; margin-bottom: 14px; font-size: 13px; }
+  nav.topnav a { color: #1a1a1a; text-decoration: none; border-bottom: 2px solid transparent; padding-bottom: 2px; }
+  nav.topnav a.active { border-bottom-color: #1a1a1a; font-weight: bold; }
+  nav.topnav span.future { color: #999; }
+
+  header {
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 10px; margin-bottom: 16px;
+  }
+  header h1 { font-size: 20px; }
+  select, button {
+    font-family: inherit; font-size: 13px; padding: 7px 10px;
+    border: 1px solid #333; border-radius: 4px; background: #fff; color: #1a1a1a;
+  }
+  button { cursor: pointer; }
+  button:hover { background: #eee; }
+  button.tab.active { background: #1a1a1a; color: #fff; }
+
+  .chart-card {
+    background: #fff; border: 1px solid #ccc; border-radius: 6px;
+    padding: 14px; margin-bottom: 16px; position: relative; min-height: 260px;
+  }
+  .chart-card h2 { font-size: 14px; margin-bottom: 10px; }
+  .chart-card canvas { max-height: 220px; }
+  .empty-msg {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    color: #888; font-size: 13px; text-align: center; width: 80%;
+  }
+
+  .tab-row { display: flex; gap: 6px; margin-bottom: 10px; }
+
+  .insights-panel {
+    background: #fff; border: 1px solid #ccc; border-radius: 6px; padding: 14px;
+  }
+  .insights-panel h2 { font-size: 14px; margin-bottom: 10px; }
+  .insight-item {
+    font-size: 13px; padding: 8px 0; border-bottom: 1px solid #eee; display: flex; gap: 8px;
+  }
+  .insight-item:last-child { border-bottom: none; }
+  .insight-icon { flex-shrink: 0; }
+
+  @media (max-width: 700px) {
+    header { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <nav class="topnav">
+    <a href="dashboard.html">Dashboard</a>
+    <a href="transactions.html">Transactions</a>
+    <a href="budgets.html">Budgets &amp; Goals</a>
+    <a href="analytics.html" class="active">Analytics</a>
+  </nav>
+
+  <header>
+    <h1>Analytics &amp; Insights</h1>
+    <select id="timeframeSelect">
+      <option value="6">Last 6 Months</option>
+      <option value="12" selected>Last 12 Months</option>
+    </select>
+  </header>
+
+  <div class="chart-card">
+    <h2>Income vs. Expense Trend</h2>
+    <canvas id="cashflowChart"></canvas>
+    <div class="empty-msg hidden" id="cashflowEmptyMsg">No transactions yet — this chart will fill in as you log income and expenses.</div>
+  </div>
+
+  <div class="chart-card">
+    <h2>Net Worth Trajectory</h2>
+    <canvas id="networthChart"></canvas>
+    <div class="empty-msg hidden" id="networthEmptyMsg">No transactions yet — your net worth trend will show up here.</div>
+  </div>
+
+  <div class="chart-card">
+    <div class="tab-row">
+      <button class="tab active" id="tabDayOfWeek" type="button">Spending by Day of Week</button>
+      <button class="tab" id="tabCategoryCompare" type="button">Category Comparison (Current vs 3-Mo Avg)</button>
+    </div>
+    <canvas id="breakdownChart"></canvas>
+    <div class="empty-msg hidden" id="breakdownEmptyMsg">Not enough expense data yet for this breakdown.</div>
+  </div>
+
+  <div class="insights-panel">
+    <h2>💡 Smart Insights Feed</h2>
+    <div id="insightsFeed"></div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- Shared constants (must match other pages) ----------
+  var EXPENSE_CATEGORIES = ["Food", "Rent", "Transport", "Entertainment", "Utilities", "Shopping", "Health", "Other"];
+
+  var cashflowChartInstance = null;
+  var networthChartInstance = null;
+  var breakdownChartInstance = null;
+  var activeBreakdownTab = "day-of-week";
+
+  // ---------- API ----------
+  async function fetchTransactions() {
+    try {
+      var res = await fetch("/api/transactions");
+      if (!res.ok) throw new Error("GET /api/transactions failed: " + res.status);
+      return res.json();
+    } catch (e) {
+      console.error(e);
+      return [];
+    }
+  }
+
+  // Cached copy so the breakdown tab toggle doesn't need to refetch on every click.
+  var cachedTransactions = [];
+
+  // ---------- Helpers ----------
+  function formatCurrency(n) { return "₹" + Math.round(n).toLocaleString("en-IN"); }
+  function toMonthKey(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"); }
+  function monthLabel(d) { return d.toLocaleDateString("en-IN", { month: "short", year: "2-digit" }); }
+
+  function getTrailingMonths(count) {
+    var now = new Date();
+    var months = [];
+    for (var i = count - 1; i >= 0; i--) {
+      months.push(new Date(now.getFullYear(), now.getMonth() - i, 1));
+    }
+    return months;
+  }
+
+  // ---------- Cash flow trend chart ----------
+  function renderCashflowChart(transactions, monthCount) {
+    var months = getTrailingMonths(monthCount);
+    var canvas = document.getElementById("cashflowChart");
+    var emptyMsg = document.getElementById("cashflowEmptyMsg");
+
+    if (transactions.length === 0) {
+      canvas.classList.add("hidden");
+      emptyMsg.classList.remove("hidden");
+      if (cashflowChartInstance) { cashflowChartInstance.destroy(); cashflowChartInstance = null; }
+      return;
+    }
+    canvas.classList.remove("hidden");
+    emptyMsg.classList.add("hidden");
+
+    var incomeData = months.map(function (m) {
+      return transactions.reduce(function (sum, tx) {
+        return (tx.type === "income" && toMonthKey(new Date(tx.date)) === toMonthKey(m)) ? sum + tx.amount : sum;
+      }, 0);
+    });
+    var expenseData = months.map(function (m) {
+      return transactions.reduce(function (sum, tx) {
+        return (tx.type === "expense" && toMonthKey(new Date(tx.date)) === toMonthKey(m)) ? sum + tx.amount : sum;
+      }, 0);
+    });
+
+    if (cashflowChartInstance) { cashflowChartInstance.destroy(); cashflowChartInstance = null; }
+    cashflowChartInstance = new Chart(canvas.getContext("2d"), {
+      type: "line",
+      data: {
+        labels: months.map(monthLabel),
+        datasets: [
+          { label: "Income", data: incomeData, borderColor: "#2f9e44", backgroundColor: "rgba(47,158,68,0.12)", fill: true, tension: 0.25 },
+          { label: "Expenses", data: expenseData, borderColor: "#e03131", backgroundColor: "rgba(224,49,49,0.12)", fill: true, tension: 0.25 }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } } },
+        scales: { y: { beginAtZero: true, ticks: { font: { size: 10 } } }, x: { ticks: { font: { size: 10 } } } }
+      }
+    });
+  }
+
+  // ---------- Net worth trajectory ----------
+  function renderNetWorthChart(transactions, monthCount) {
+    var months = getTrailingMonths(monthCount);
+    var canvas = document.getElementById("networthChart");
+    var emptyMsg = document.getElementById("networthEmptyMsg");
+
+    if (transactions.length === 0) {
+      canvas.classList.add("hidden");
+      emptyMsg.classList.remove("hidden");
+      if (networthChartInstance) { networthChartInstance.destroy(); networthChartInstance = null; }
+      return;
+    }
+    canvas.classList.remove("hidden");
+    emptyMsg.classList.add("hidden");
+
+    var sorted = transactions.slice().sort(function (a, b) { return new Date(a.date) - new Date(b.date); });
+
+    var netWorthData = months.map(function (m) {
+      var monthEnd = new Date(m.getFullYear(), m.getMonth() + 1, 0, 23, 59, 59);
+      var balance = 0;
+      sorted.forEach(function (tx) {
+        var txDate = new Date(tx.date);
+        if (txDate > monthEnd) return;
+        if (tx.type === "income") balance += tx.amount;
+        else if (tx.type === "expense") balance -= tx.amount;
+      });
+      return balance;
+    });
+
+    if (networthChartInstance) { networthChartInstance.destroy(); networthChartInstance = null; }
+    networthChartInstance = new Chart(canvas.getContext("2d"), {
+      type: "line",
+      data: {
+        labels: months.map(monthLabel),
+        datasets: [{ label: "Net Worth", data: netWorthData, borderColor: "#4c6ef5", backgroundColor: "rgba(76,110,245,0.12)", fill: true, tension: 0.25 }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: { y: { ticks: { font: { size: 10 } } }, x: { ticks: { font: { size: 10 } } } }
+      }
+    });
+  }
+
+  // ---------- Breakdown: day of week ----------
+  function computeDayOfWeekSpending(transactions) {
+    var now = new Date();
+    var threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+    var totals = [0, 0, 0, 0, 0, 0, 0]; // Sun..Sat
+    var counts = [0, 0, 0, 0, 0, 0, 0];
+
+    transactions.forEach(function (tx) {
+      if (tx.type !== "expense") return;
+      var d = new Date(tx.date);
+      if (d < threeMonthsAgo) return;
+      var day = d.getDay();
+      totals[day] += tx.amount;
+      counts[day] += 1;
+    });
+
+    return { totals: totals, counts: counts };
+  }
+
+  function renderDayOfWeekChart(transactions) {
+    var canvas = document.getElementById("breakdownChart");
+    var emptyMsg = document.getElementById("breakdownEmptyMsg");
+    var data = computeDayOfWeekSpending(transactions);
+    var hasData = data.totals.some(function (t) { return t > 0; });
+
+    if (!hasData) {
+      canvas.classList.add("hidden");
+      emptyMsg.classList.remove("hidden");
+      if (breakdownChartInstance) { breakdownChartInstance.destroy(); breakdownChartInstance = null; }
+      return;
+    }
+    canvas.classList.remove("hidden");
+    emptyMsg.classList.add("hidden");
+
+    if (breakdownChartInstance) { breakdownChartInstance.destroy(); breakdownChartInstance = null; }
+    breakdownChartInstance = new Chart(canvas.getContext("2d"), {
+      type: "bar",
+      data: {
+        labels: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+        datasets: [{ label: "Spending (last 3 months)", data: data.totals, backgroundColor: "#f76707" }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { font: { size: 10 } } }, x: { ticks: { font: { size: 10 } } } }
+      }
+    });
+  }
+
+  // ---------- Breakdown: category comparison ----------
+  function renderCategoryCompareChart(transactions) {
+    var canvas = document.getElementById("breakdownChart");
+    var emptyMsg = document.getElementById("breakdownEmptyMsg");
+    var now = new Date();
+
+    var currentTotals = {};
+    var priorTotals = {}; // sum over prior 3 months, will divide by 3 for average
+
+    transactions.forEach(function (tx) {
+      if (tx.type !== "expense") return;
+      var d = new Date(tx.date);
+      if (toMonthKey(d) === toMonthKey(now)) {
+        currentTotals[tx.category] = (currentTotals[tx.category] || 0) + tx.amount;
+      } else {
+        var monthsAgo = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
+        if (monthsAgo >= 1 && monthsAgo <= 3) {
+          priorTotals[tx.category] = (priorTotals[tx.category] || 0) + tx.amount;
+        }
+      }
+    });
+
+    var categories = EXPENSE_CATEGORIES.filter(function (cat) {
+      return (currentTotals[cat] || 0) > 0 || (priorTotals[cat] || 0) > 0;
+    });
+
+    if (categories.length === 0) {
+      canvas.classList.add("hidden");
+      emptyMsg.classList.remove("hidden");
+      if (breakdownChartInstance) { breakdownChartInstance.destroy(); breakdownChartInstance = null; }
+      return;
+    }
+    canvas.classList.remove("hidden");
+    emptyMsg.classList.add("hidden");
+
+    var currentData = categories.map(function (cat) { return currentTotals[cat] || 0; });
+    var avgData = categories.map(function (cat) { return (priorTotals[cat] || 0) / 3; });
+
+    if (breakdownChartInstance) { breakdownChartInstance.destroy(); breakdownChartInstance = null; }
+    breakdownChartInstance = new Chart(canvas.getContext("2d"), {
+      type: "bar",
+      data: {
+        labels: categories,
+        datasets: [
+          { label: "This Month", data: currentData, backgroundColor: "#4c6ef5" },
+          { label: "3-Month Average", data: avgData, backgroundColor: "#adb5bd" }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } } },
+        scales: { y: { beginAtZero: true, ticks: { font: { size: 10 } } }, x: { ticks: { font: { size: 10 } } } }
+      }
+    });
+  }
+
+  function renderBreakdown(transactions) {
+    if (activeBreakdownTab === "day-of-week") {
+      renderDayOfWeekChart(transactions);
+    } else {
+      renderCategoryCompareChart(transactions);
+    }
+  }
+
+  document.getElementById("tabDayOfWeek").addEventListener("click", function () {
+    activeBreakdownTab = "day-of-week";
+    document.getElementById("tabDayOfWeek").classList.add("active");
+    document.getElementById("tabCategoryCompare").classList.remove("active");
+    renderBreakdown(cachedTransactions);
+  });
+  document.getElementById("tabCategoryCompare").addEventListener("click", function () {
+    activeBreakdownTab = "category-compare";
+    document.getElementById("tabCategoryCompare").classList.add("active");
+    document.getElementById("tabDayOfWeek").classList.remove("active");
+    renderBreakdown(cachedTransactions);
+  });
+
+  // ---------- Smart Insights ----------
+  function generateInsights(transactions) {
+    var insights = [];
+    var now = new Date();
+
+    // 1. Spending leak: category with biggest % rise vs last month
+    var currentMonthByCat = {}, lastMonthByCat = {};
+    var lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    transactions.forEach(function (tx) {
+      if (tx.type !== "expense") return;
+      var d = new Date(tx.date);
+      if (toMonthKey(d) === toMonthKey(now)) currentMonthByCat[tx.category] = (currentMonthByCat[tx.category] || 0) + tx.amount;
+      else if (toMonthKey(d) === toMonthKey(lastMonth)) lastMonthByCat[tx.category] = (lastMonthByCat[tx.category] || 0) + tx.amount;
+    });
+
+    var biggestLeak = null;
+    Object.keys(currentMonthByCat).forEach(function (cat) {
+      var prev = lastMonthByCat[cat] || 0;
+      if (prev <= 0) return;
+      var pct = ((currentMonthByCat[cat] - prev) / prev) * 100;
+      if (pct > 15 && (!biggestLeak || pct > biggestLeak.pct)) {
+        biggestLeak = { cat: cat, pct: pct };
+      }
+    });
+    if (biggestLeak) {
+      insights.push({
+        icon: "⚠️",
+        text: "Your spending in " + biggestLeak.cat + " has risen by " + Math.round(biggestLeak.pct) + "% compared to last month."
+      });
+    }
+
+    // 2. Predictive runway
+    var netBalance = transactions.reduce(function (sum, tx) {
+      if (tx.type === "income") return sum + tx.amount;
+      if (tx.type === "expense") return sum - tx.amount;
+      return sum;
+    }, 0);
+
+    var last3Months = getTrailingMonths(3);
+    var totalExpenseLast3 = last3Months.reduce(function (sum, m) {
+      return sum + transactions.reduce(function (s, tx) {
+        return (tx.type === "expense" && toMonthKey(new Date(tx.date)) === toMonthKey(m)) ? s + tx.amount : s;
+      }, 0);
+    }, 0);
+    var avgMonthlyExpense = totalExpenseLast3 / 3;
+
+    if (avgMonthlyExpense > 0 && netBalance > 0) {
+      var runwayMonths = netBalance / avgMonthlyExpense;
+      insights.push({
+        icon: "📊",
+        text: "Based on your average spending over the last 3 months, your current balance covers about " +
+          runwayMonths.toFixed(1) + " months of expenses (Emergency Fund Runway)."
+      });
+    }
+
+    // 3. Weekend vs weekday spending
+    var dowData = computeDayOfWeekSpending(transactions);
+    var weekendTotal = dowData.totals[0] + dowData.totals[6];
+    var weekendCount = dowData.counts[0] + dowData.counts[6];
+    var weekdayTotal = dowData.totals[1] + dowData.totals[2] + dowData.totals[3] + dowData.totals[4] + dowData.totals[5];
+    var weekdayCount = dowData.counts[1] + dowData.counts[2] + dowData.counts[3] + dowData.counts[4] + dowData.counts[5];
+
+    if (weekendCount > 0 && weekdayCount > 0) {
+      var weekendAvgPerDay = weekendTotal / 2;
+      var weekdayAvgPerDay = weekdayTotal / 5;
+      if (weekdayAvgPerDay > 0) {
+        var diffPct = ((weekendAvgPerDay - weekdayAvgPerDay) / weekdayAvgPerDay) * 100;
+        if (Math.abs(diffPct) > 10) {
+          insights.push({
+            icon: diffPct > 0 ? "📅" : "📉",
+            text: "You spend " + Math.round(Math.abs(diffPct)) + "% " + (diffPct > 0 ? "more" : "less") +
+              " per day on weekends compared to weekdays (last 3 months)."
+          });
+        }
+      }
+    }
+
+    // 4. Anomaly detection: unusually large expense this month vs category historical average
+    var historicalByCategory = {};
+    var historicalCounts = {};
+    transactions.forEach(function (tx) {
+      if (tx.type !== "expense") return;
+      if (toMonthKey(new Date(tx.date)) === toMonthKey(now)) return;
+      historicalByCategory[tx.category] = (historicalByCategory[tx.category] || 0) + tx.amount;
+      historicalCounts[tx.category] = (historicalCounts[tx.category] || 0) + 1;
+    });
+
+    var anomaly = null;
+    transactions.forEach(function (tx) {
+      if (tx.type !== "expense") return;
+      if (toMonthKey(new Date(tx.date)) !== toMonthKey(now)) return;
+      var histCount = historicalCounts[tx.category] || 0;
+      if (histCount < 2) return;
+      var histAvg = historicalByCategory[tx.category] / histCount;
+      if (histAvg > 0 && tx.amount > histAvg * 2.5) {
+        if (!anomaly || tx.amount > anomaly.amount) {
+          anomaly = { amount: tx.amount, category: tx.category, date: tx.date, histAvg: histAvg };
+        }
+      }
+    });
+    if (anomaly) {
+      var anomalyDate = new Date(anomaly.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
+      insights.push({
+        icon: "🔍",
+        text: "Unusual transaction: " + formatCurrency(anomaly.amount) + " in " + anomaly.category + " on " +
+          anomalyDate + " — much higher than your typical " + formatCurrency(anomaly.histAvg) + " for this category."
+      });
+    }
+
+    // 5. Best savings rate in recent months
+    var last6Months = getTrailingMonths(6);
+    var rates = last6Months.map(function (m) {
+      var income = transactions.reduce(function (s, tx) {
+        return (tx.type === "income" && toMonthKey(new Date(tx.date)) === toMonthKey(m)) ? s + tx.amount : s;
+      }, 0);
+      var expense = transactions.reduce(function (s, tx) {
+        return (tx.type === "expense" && toMonthKey(new Date(tx.date)) === toMonthKey(m)) ? s + tx.amount : s;
+      }, 0);
+      return income > 0 ? ((income - expense) / income) * 100 : null;
+    });
+    var currentRate = rates[rates.length - 1];
+    var priorRates = rates.slice(0, rates.length - 1).filter(function (r) { return r !== null; });
+    if (currentRate !== null && currentRate > 0 && (priorRates.length === 0 || currentRate > Math.max.apply(null, priorRates))) {
+      insights.push({
+        icon: "🎉",
+        text: "Great job! Your savings rate this month is your highest in the last 6 months at " + Math.round(currentRate) + "%."
+      });
+    }
+
+    return insights;
+  }
+
+  function renderInsights(transactions) {
+    var feed = document.getElementById("insightsFeed");
+    var insights = generateInsights(transactions);
+
+    if (transactions.length === 0) {
+      feed.innerHTML = '<div class="insight-item"><span class="insight-icon">👋</span><span>Start logging transactions and insights will appear here automatically.</span></div>';
+      return;
+    }
+    if (insights.length === 0) {
+      feed.innerHTML = '<div class="insight-item"><span class="insight-icon">🙂</span><span>Nothing unusual to report — keep logging transactions for more personalized insights.</span></div>';
+      return;
+    }
+
+    feed.innerHTML = "";
+    insights.forEach(function (insight) {
+      var div = document.createElement("div");
+      div.className = "insight-item";
+      div.innerHTML = '<span class="insight-icon">' + insight.icon + '</span><span>' + insight.text + '</span>';
+      feed.appendChild(div);
+    });
+  }
+
+  // ---------- Master render ----------
+  function renderWithCache() {
+    var monthCount = parseInt(document.getElementById("timeframeSelect").value, 10);
+    renderCashflowChart(cachedTransactions, monthCount);
+    renderNetWorthChart(cachedTransactions, monthCount);
+    renderBreakdown(cachedTransactions);
+    renderInsights(cachedTransactions);
+  }
+
+  async function renderAll() {
+    cachedTransactions = await fetchTransactions();
+    renderWithCache();
+  }
+
+  document.getElementById("timeframeSelect").addEventListener("change", renderWithCache);
+
+  renderAll();
+})();
+</script>
+</body>
+</html>

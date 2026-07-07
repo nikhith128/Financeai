@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FinanceAI - Budgets & Goals</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    background: #f2f2f2;
+    color: #1a1a1a;
+    padding: 16px;
+  }
+  .app { max-width: 1100px; margin: 0 auto; }
+
+  nav.topnav { display: flex; gap: 14px; margin-bottom: 14px; font-size: 13px; }
+  nav.topnav a { color: #1a1a1a; text-decoration: none; border-bottom: 2px solid transparent; padding-bottom: 2px; }
+  nav.topnav a.active { border-bottom-color: #1a1a1a; font-weight: bold; }
+  nav.topnav span.future { color: #999; }
+
+  header {
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 10px; margin-bottom: 16px;
+  }
+  header h1 { font-size: 20px; }
+
+  button {
+    cursor: pointer; font-family: inherit; font-size: 14px;
+    padding: 8px 14px; border: 1px solid #333; background: #fff;
+    color: #1a1a1a; border-radius: 4px;
+  }
+  button:hover { background: #eee; }
+  button.primary { background: #1a1a1a; color: #fff; }
+  button.primary:hover { background: #333; }
+  button.small { padding: 3px 8px; font-size: 12px; }
+
+  section.panel {
+    background: #fff; border: 1px solid #ccc; border-radius: 6px;
+    padding: 14px; margin-bottom: 18px;
+  }
+  section.panel h2 { font-size: 15px; margin-bottom: 12px; }
+
+  /* Summary cards */
+  .summary-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px; }
+  .summary-card { background: #fff; border: 1px solid #ccc; border-radius: 6px; padding: 12px; }
+  .summary-card .label { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.03em; }
+  .summary-card .value { font-size: 20px; font-weight: bold; margin-top: 4px; }
+  .summary-card .value.negative { color: #b3261e; }
+
+  /* Budget rows */
+  .budget-row { margin-bottom: 14px; font-size: 13px; }
+  .budget-row-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+  .budget-row-top .cat-name { font-weight: bold; }
+  .overspent-pill {
+    display: inline-block; font-size: 11px; color: #fff; background: #d9342b;
+    padding: 1px 6px; border-radius: 10px; margin-left: 6px;
+  }
+  .progress-track { background: #eee; border-radius: 4px; height: 9px; overflow: hidden; margin-bottom: 3px; }
+  .progress-fill { height: 100%; }
+  .progress-fill.green { background: #2e9e4f; }
+  .progress-fill.yellow { background: #e0a800; }
+  .progress-fill.red { background: #d9342b; }
+  .budget-row-bottom { display: flex; justify-content: space-between; color: #666; font-size: 12px; }
+  .no-budget-note { color: #999; font-style: italic; }
+
+  /* Goals grid */
+  .goals-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px;
+  }
+  .goal-card {
+    border: 1px solid #ccc; border-radius: 6px; padding: 14px;
+    display: flex; gap: 12px; align-items: flex-start;
+  }
+  .goal-ring { flex-shrink: 0; }
+  .goal-info { flex: 1; min-width: 0; }
+  .goal-title { font-weight: bold; font-size: 14px; }
+  .goal-target-date { font-size: 11px; color: #888; margin-bottom: 6px; }
+  .goal-amounts { font-size: 13px; margin-bottom: 6px; }
+  .goal-milestone { font-size: 12px; color: #555; margin-bottom: 8px; }
+  .goal-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .empty-state { color: #888; font-size: 13px; padding: 6px 0; }
+
+  /* Modal */
+  .modal-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.4);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100;
+  }
+  .modal-overlay.hidden { display: none; }
+  .modal {
+    background: #fff; border-radius: 6px; padding: 18px;
+    width: 100%; max-width: 360px; max-height: 90vh; overflow-y: auto;
+  }
+  .modal h2 { font-size: 16px; margin-bottom: 12px; }
+  .form-group { margin-bottom: 10px; }
+  .form-group label { display: block; font-size: 12px; color: #555; margin-bottom: 3px; }
+  .form-group input, .form-group select {
+    width: 100%; padding: 7px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px;
+  }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+  .error-msg { color: #b3261e; font-size: 12px; margin-top: 4px; display: none; }
+  .hidden { display: none; }
+
+  @media (max-width: 700px) {
+    .summary-strip { grid-template-columns: 1fr; }
+    .goals-grid { grid-template-columns: 1fr; }
+    .goal-card { flex-direction: column; align-items: center; text-align: center; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <nav class="topnav">
+    <a href="dashboard.html">Dashboard</a>
+    <a href="transactions.html">Transactions</a>
+    <a href="budgets.html" class="active">Budgets &amp; Goals</a>
+    <a href="analytics.html">Analytics</a>
+  </nav>
+
+  <header>
+    <h1>Budgets &amp; Goals</h1>
+    <button class="primary" id="btnNewGoal">+ New Goal</button>
+  </header>
+
+  <div class="summary-strip">
+    <div class="summary-card">
+      <div class="label">Total Budget Allocated</div>
+      <div class="value" id="sumAllocated">₹0</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">Total Spent So Far</div>
+      <div class="value" id="sumSpent">₹0</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">Remaining Allowance</div>
+      <div class="value" id="sumRemaining">₹0</div>
+    </div>
+  </div>
+
+  <section class="panel">
+    <h2>Monthly Budgets</h2>
+    <div id="budgetList"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Savings Goals</h2>
+    <div class="goals-grid" id="goalsGrid"></div>
+  </section>
+
+</div>
+
+<!-- Edit Budget Modal -->
+<div class="modal-overlay hidden" id="budgetModalOverlay">
+  <div class="modal">
+    <h2 id="budgetModalTitle">Edit Budget</h2>
+    <form id="budgetForm">
+      <input type="hidden" id="budgetCategoryField">
+      <div class="form-group">
+        <label>Category</label>
+        <input type="text" id="budgetCategoryDisplay" disabled>
+      </div>
+      <div class="form-group">
+        <label for="budgetLimitInput">Monthly Limit (₹) — set to 0 to remove this budget</label>
+        <input type="number" id="budgetLimitInput" min="0" step="1" required>
+      </div>
+      <div class="error-msg" id="budgetFormError"></div>
+      <div class="modal-actions">
+        <button type="button" id="btnCancelBudgetModal">Cancel</button>
+        <button type="submit" class="primary">Save Budget</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Add/Edit Goal Modal -->
+<div class="modal-overlay hidden" id="goalModalOverlay">
+  <div class="modal">
+    <h2 id="goalModalTitle">New Goal</h2>
+    <form id="goalForm">
+      <input type="hidden" id="goalIdField">
+      <div class="form-group">
+        <label for="goalTitleInput">Goal Title</label>
+        <input type="text" id="goalTitleInput" placeholder="e.g. MacBook Pro Fund" required>
+      </div>
+      <div class="form-group">
+        <label for="goalTargetAmountInput">Target Amount (₹)</label>
+        <input type="number" id="goalTargetAmountInput" min="1" step="1" required>
+      </div>
+      <div class="form-group">
+        <label for="goalTargetDateInput">Target Date</label>
+        <input type="date" id="goalTargetDateInput" required>
+      </div>
+      <div class="error-msg" id="goalFormError"></div>
+      <div class="modal-actions">
+        <button type="button" id="btnCancelGoalModal">Cancel</button>
+        <button type="submit" class="primary">Save Goal</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Contribute to Goal Modal -->
+<div class="modal-overlay hidden" id="contributeModalOverlay">
+  <div class="modal">
+    <h2 id="contributeModalTitle">Contribute to Goal</h2>
+    <form id="contributeForm">
+      <input type="hidden" id="contributeGoalIdField">
+      <div class="form-group">
+        <label for="contributeAmountInput">Amount (₹)</label>
+        <input type="number" id="contributeAmountInput" min="1" step="1" required>
+      </div>
+      <div class="form-group">
+        <label for="contributeAccountInput">From Account</label>
+        <select id="contributeAccountInput"></select>
+      </div>
+      <div class="error-msg" id="contributeFormError"></div>
+      <div class="modal-actions">
+        <button type="button" id="btnCancelContributeModal">Cancel</button>
+        <button type="submit" class="primary">Contribute</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- Shared constants (must match dashboard.html / transactions.html) ----------
+  var EXPENSE_CATEGORIES = ["Food", "Rent", "Transport", "Entertainment", "Utilities", "Shopping", "Health", "Other"];
+  var ACCOUNTS = ["Cash", "Bank", "Credit Card"];
+  var CATEGORY_ICONS = {
+    "Food": "🍔", "Rent": "🏠", "Transport": "🚗", "Entertainment": "🍿",
+    "Utilities": "⚡", "Shopping": "🛍️", "Health": "💊", "Other": "💰"
+  };
+  var DEFAULT_BUDGETS = {
+    "Food": 6000, "Rent": 15000, "Transport": 3000, "Entertainment": 2000,
+    "Utilities": 2500, "Shopping": 4000, "Health": 2000, "Other": 1500
+  };
+
+  // ---------- API helpers (Express + JSON backend) ----------
+  var API_BASE = "/api";
+
+  async function apiGet(path) {
+    var res = await fetch(API_BASE + path);
+    if (!res.ok) throw new Error("GET " + path + " failed: " + res.status);
+    return res.json();
+  }
+  async function apiPost(path, body) {
+    var res = await fetch(API_BASE + path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) throw new Error("POST " + path + " failed: " + res.status);
+    return res.json();
+  }
+  async function apiPut(path, body) {
+    var res = await fetch(API_BASE + path, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) throw new Error("PUT " + path + " failed: " + res.status);
+    return res.json();
+  }
+  async function apiDelete(path) {
+    var res = await fetch(API_BASE + path, { method: "DELETE" });
+    if (!res.ok) throw new Error("DELETE " + path + " failed: " + res.status);
+  }
+
+  function fetchTransactions() { return apiGet("/transactions"); }
+  function fetchBudgets() { return apiGet("/budgets"); }
+  function updateBudgetApi(category, limit) { return apiPut("/budgets/" + encodeURIComponent(category), { limit: limit }); }
+  function fetchGoals() { return apiGet("/goals"); }
+  function createGoalApi(goal) { return apiPost("/goals", goal); }
+  function updateGoalApi(id, goal) { return apiPut("/goals/" + id, goal); }
+  function deleteGoalApi(id) { return apiDelete("/goals/" + id); }
+  function contributeGoalApi(id, amount, account) { return apiPost("/goals/" + id + "/contribute", { amount: amount, account: account }); }
+
+  // Cached copies for click handlers; refreshed after any mutation.
+  var cachedTransactions = [];
+  var cachedBudgets = {};
+  var cachedGoals = [];
+
+  // ---------- Helpers ----------
+  function formatCurrency(n) { return "₹" + Math.round(n).toLocaleString("en-IN"); }
+  function isSameMonth(dateStr, refDate) {
+    var d = new Date(dateStr);
+    return d.getFullYear() === refDate.getFullYear() && d.getMonth() === refDate.getMonth();
+  }
+  function monthsBetween(from, to) {
+    return (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth());
+  }
+
+  function populateSelect(select, options) {
+    select.innerHTML = "";
+    options.forEach(function (opt) {
+      var el = document.createElement("option");
+      el.value = opt; el.textContent = opt;
+      select.appendChild(el);
+    });
+  }
+
+  // ---------- Budgets rendering ----------
+  function renderBudgets(budgets, transactions) {
+    var now = new Date();
+
+    var spentByCategory = {};
+    transactions.forEach(function (tx) {
+      if (tx.type === "expense" && isSameMonth(tx.date, now)) {
+        spentByCategory[tx.category] = (spentByCategory[tx.category] || 0) + tx.amount;
+      }
+    });
+
+    var totalAllocated = 0;
+    var totalSpent = 0;
+
+    var listEl = document.getElementById("budgetList");
+    listEl.innerHTML = "";
+
+    EXPENSE_CATEGORIES.forEach(function (cat) {
+      var limit = budgets[cat] || 0;
+      var spent = spentByCategory[cat] || 0;
+
+      if (limit > 0) {
+        totalAllocated += limit;
+        totalSpent += spent;
+      }
+
+      var row = document.createElement("div");
+      row.className = "budget-row";
+
+      if (limit <= 0) {
+        row.innerHTML =
+          '<div class="budget-row-top">' +
+            '<span class="cat-name">' + (CATEGORY_ICONS[cat] || "") + ' ' + cat + '</span>' +
+            '<button class="small" data-action="edit-budget" data-category="' + cat + '">Set Budget</button>' +
+          '</div>' +
+          '<div class="no-budget-note">No budget set for this category' + (spent > 0 ? " — " + formatCurrency(spent) + " spent this month" : "") + '.</div>';
+        listEl.appendChild(row);
+        return;
+      }
+
+      var pct = (spent / limit) * 100;
+      var colorClass = pct < 70 ? "green" : (pct <= 90 ? "yellow" : "red");
+      var overPill = spent > limit
+        ? '<span class="overspent-pill">Overspent by ' + formatCurrency(spent - limit) + '</span>'
+        : "";
+
+      row.innerHTML =
+        '<div class="budget-row-top">' +
+          '<span class="cat-name">' + (CATEGORY_ICONS[cat] || "") + ' ' + cat + overPill + '</span>' +
+          '<button class="small" data-action="edit-budget" data-category="' + cat + '">Edit</button>' +
+        '</div>' +
+        '<div class="progress-track"><div class="progress-fill ' + colorClass + '" style="width:' + Math.min(pct, 100) + '%"></div></div>' +
+        '<div class="budget-row-bottom"><span>' + formatCurrency(spent) + ' / ' + formatCurrency(limit) + ' spent</span><span>' + Math.round(pct) + '%</span></div>';
+
+      listEl.appendChild(row);
+    });
+
+    document.getElementById("sumAllocated").textContent = formatCurrency(totalAllocated);
+    document.getElementById("sumSpent").textContent = formatCurrency(totalSpent);
+    var remaining = totalAllocated - totalSpent;
+    var remainingEl = document.getElementById("sumRemaining");
+    remainingEl.textContent = formatCurrency(remaining);
+    remainingEl.className = "value" + (remaining < 0 ? " negative" : "");
+  }
+
+  // ---------- Goals rendering ----------
+  function buildRingSVG(pct) {
+    var r = 32;
+    var circumference = 2 * Math.PI * r;
+    var clamped = Math.max(0, Math.min(pct, 100));
+    var offset = circumference * (1 - clamped / 100);
+    var color = pct >= 100 ? "#2e9e4f" : (pct >= 50 ? "#4c6ef5" : "#e0a800");
+    return (
+      '<svg width="80" height="80" viewBox="0 0 80 80">' +
+        '<circle cx="40" cy="40" r="' + r + '" fill="none" stroke="#eee" stroke-width="8"></circle>' +
+        '<circle cx="40" cy="40" r="' + r + '" fill="none" stroke="' + color + '" stroke-width="8" ' +
+          'stroke-dasharray="' + circumference + '" stroke-dashoffset="' + offset + '" ' +
+          'stroke-linecap="round" transform="rotate(-90 40 40)"></circle>' +
+        '<text x="40" y="45" text-anchor="middle" font-size="15" font-weight="bold" fill="#1a1a1a">' + Math.round(pct) + '%</text>' +
+      '</svg>'
+    );
+  }
+
+  function renderGoals(goals) {
+    var grid = document.getElementById("goalsGrid");
+    grid.innerHTML = "";
+
+    if (goals.length === 0) {
+      grid.innerHTML = '<div class="empty-state">No savings goals yet. Click "+ New Goal" to start one.</div>';
+      return;
+    }
+
+    var now = new Date();
+
+    goals.forEach(function (goal) {
+      var pct = goal.targetAmount > 0 ? (goal.savedAmount / goal.targetAmount) * 100 : 0;
+      var targetDate = new Date(goal.targetDate + "T00:00:00");
+      var remainingAmount = goal.targetAmount - goal.savedAmount;
+      var monthsRemaining = monthsBetween(now, targetDate);
+
+      var milestoneMsg;
+      if (remainingAmount <= 0) {
+        milestoneMsg = "Goal complete! 🎉";
+      } else if (monthsRemaining <= 0) {
+        milestoneMsg = "Target date has passed — " + formatCurrency(remainingAmount) + " still needed.";
+      } else {
+        var perMonth = remainingAmount / monthsRemaining;
+        milestoneMsg = "Save " + formatCurrency(perMonth) + "/month to hit your goal on time.";
+      }
+
+      var card = document.createElement("div");
+      card.className = "goal-card";
+      card.innerHTML =
+        '<div class="goal-ring">' + buildRingSVG(pct) + '</div>' +
+        '<div class="goal-info">' +
+          '<div class="goal-title">' + goal.title + '</div>' +
+          '<div class="goal-target-date">Target: ' + targetDate.toLocaleDateString("en-IN", { month: "short", year: "numeric" }) + '</div>' +
+          '<div class="goal-amounts">' + formatCurrency(goal.savedAmount) + ' / ' + formatCurrency(goal.targetAmount) + '</div>' +
+          '<div class="goal-milestone">' + milestoneMsg + '</div>' +
+          '<div class="goal-actions">' +
+            '<button class="small" data-action="contribute" data-id="' + goal.id + '">Contribute</button>' +
+            '<button class="small" data-action="edit-goal" data-id="' + goal.id + '">Edit</button>' +
+            '<button class="small" data-action="delete-goal" data-id="' + goal.id + '">Delete</button>' +
+          '</div>' +
+        '</div>';
+      grid.appendChild(card);
+    });
+  }
+
+  async function renderAll() {
+    var results = await Promise.all([fetchTransactions(), fetchBudgets(), fetchGoals()]);
+    cachedTransactions = results[0];
+    cachedBudgets = results[1];
+    cachedGoals = results[2];
+    renderBudgets(cachedBudgets, cachedTransactions);
+    renderGoals(cachedGoals);
+  }
+
+  // ---------- Budget modal ----------
+  var budgetModalOverlay = document.getElementById("budgetModalOverlay");
+  var budgetForm = document.getElementById("budgetForm");
+  var budgetCategoryField = document.getElementById("budgetCategoryField");
+  var budgetCategoryDisplay = document.getElementById("budgetCategoryDisplay");
+  var budgetLimitInput = document.getElementById("budgetLimitInput");
+  var budgetFormError = document.getElementById("budgetFormError");
+
+  function openBudgetModal(category) {
+    budgetFormError.style.display = "none";
+    budgetCategoryField.value = category;
+    budgetCategoryDisplay.value = category;
+    budgetLimitInput.value = cachedBudgets[category] || 0;
+    budgetModalOverlay.classList.remove("hidden");
+  }
+  function closeBudgetModal() { budgetModalOverlay.classList.add("hidden"); }
+
+  document.getElementById("btnCancelBudgetModal").addEventListener("click", closeBudgetModal);
+  budgetModalOverlay.addEventListener("click", function (e) { if (e.target === budgetModalOverlay) closeBudgetModal(); });
+
+  budgetForm.addEventListener("submit", async function (e) {
+    e.preventDefault();
+    var limit = parseFloat(budgetLimitInput.value);
+    if (isNaN(limit) || limit < 0) {
+      budgetFormError.textContent = "Enter a valid limit (0 or greater).";
+      budgetFormError.style.display = "block";
+      return;
+    }
+    try {
+      await updateBudgetApi(budgetCategoryField.value, limit);
+      closeBudgetModal();
+      await renderAll();
+    } catch (err) {
+      budgetFormError.textContent = "Couldn't save the budget. Is the FinanceAI server running?";
+      budgetFormError.style.display = "block";
+      console.error(err);
+    }
+  });
+
+  // ---------- Goal modal ----------
+  var goalModalOverlay = document.getElementById("goalModalOverlay");
+  var goalModalTitle = document.getElementById("goalModalTitle");
+  var goalForm = document.getElementById("goalForm");
+  var goalIdField = document.getElementById("goalIdField");
+  var goalTitleInput = document.getElementById("goalTitleInput");
+  var goalTargetAmountInput = document.getElementById("goalTargetAmountInput");
+  var goalTargetDateInput = document.getElementById("goalTargetDateInput");
+  var goalFormError = document.getElementById("goalFormError");
+
+  function openGoalModal(existingGoal) {
+    goalFormError.style.display = "none";
+    goalForm.reset();
+    goalIdField.value = "";
+    if (existingGoal) {
+      goalModalTitle.textContent = "Edit Goal";
+      goalIdField.value = existingGoal.id;
+      goalTitleInput.value = existingGoal.title;
+      goalTargetAmountInput.value = existingGoal.targetAmount;
+      goalTargetDateInput.value = existingGoal.targetDate;
+    } else {
+      goalModalTitle.textContent = "New Goal";
+    }
+    goalModalOverlay.classList.remove("hidden");
+  }
+  function closeGoalModal() { goalModalOverlay.classList.add("hidden"); }
+
+  document.getElementById("btnNewGoal").addEventListener("click", function () { openGoalModal(null); });
+  document.getElementById("btnCancelGoalModal").addEventListener("click", closeGoalModal);
+  goalModalOverlay.addEventListener("click", function (e) { if (e.target === goalModalOverlay) closeGoalModal(); });
+
+  goalForm.addEventListener("submit", async function (e) {
+    e.preventDefault();
+    var title = goalTitleInput.value.trim();
+    var targetAmount = parseFloat(goalTargetAmountInput.value);
+    var targetDate = goalTargetDateInput.value;
+
+    if (!title) {
+      goalFormError.textContent = "Enter a goal title.";
+      goalFormError.style.display = "block";
+      return;
+    }
+    if (!targetAmount || targetAmount <= 0) {
+      goalFormError.textContent = "Enter a valid target amount greater than 0.";
+      goalFormError.style.display = "block";
+      return;
+    }
+    if (!targetDate) {
+      goalFormError.textContent = "Select a target date.";
+      goalFormError.style.display = "block";
+      return;
+    }
+
+    var editingId = goalIdField.value;
+    var goalPayload = { title: title, targetAmount: targetAmount, targetDate: targetDate };
+
+    try {
+      if (editingId) {
+        await updateGoalApi(editingId, goalPayload);
+      } else {
+        await createGoalApi(goalPayload);
+      }
+      closeGoalModal();
+      await renderAll();
+    } catch (err) {
+      goalFormError.textContent = "Couldn't save the goal. Is the FinanceAI server running?";
+      goalFormError.style.display = "block";
+      console.error(err);
+    }
+  });
+
+  // ---------- Contribute modal ----------
+  var contributeModalOverlay = document.getElementById("contributeModalOverlay");
+  var contributeModalTitle = document.getElementById("contributeModalTitle");
+  var contributeForm = document.getElementById("contributeForm");
+  var contributeGoalIdField = document.getElementById("contributeGoalIdField");
+  var contributeAmountInput = document.getElementById("contributeAmountInput");
+  var contributeAccountInput = document.getElementById("contributeAccountInput");
+  var contributeFormError = document.getElementById("contributeFormError");
+
+  populateSelect(contributeAccountInput, ACCOUNTS);
+
+  function openContributeModal(goal) {
+    contributeFormError.style.display = "none";
+    contributeForm.reset();
+    contributeGoalIdField.value = goal.id;
+    contributeModalTitle.textContent = "Contribute to \"" + goal.title + "\"";
+    populateSelect(contributeAccountInput, ACCOUNTS);
+    contributeModalOverlay.classList.remove("hidden");
+  }
+  function closeContributeModal() { contributeModalOverlay.classList.add("hidden"); }
+
+  document.getElementById("btnCancelContributeModal").addEventListener("click", closeContributeModal);
+  contributeModalOverlay.addEventListener("click", function (e) { if (e.target === contributeModalOverlay) closeContributeModal(); });
+
+  contributeForm.addEventListener("submit", async function (e) {
+    e.preventDefault();
+    var amount = parseFloat(contributeAmountInput.value);
+    if (!amount || amount <= 0) {
+      contributeFormError.textContent = "Enter a valid amount greater than 0.";
+      contributeFormError.style.display = "block";
+      return;
+    }
+
+    var goalId = contributeGoalIdField.value;
+    try {
+      // Server updates the goal's savedAmount and logs the transfer transaction atomically.
+      await contributeGoalApi(goalId, amount, contributeAccountInput.value);
+      closeContributeModal();
+      await renderAll();
+    } catch (err) {
+      contributeFormError.textContent = "Couldn't save the contribution. Is the FinanceAI server running?";
+      contributeFormError.style.display = "block";
+      console.error(err);
+    }
+  });
+
+  // ---------- Delegated click handlers ----------
+  document.getElementById("budgetList").addEventListener("click", function (e) {
+    var btn = e.target.closest("button[data-action='edit-budget']");
+    if (!btn) return;
+    openBudgetModal(btn.getAttribute("data-category"));
+  });
+
+  document.getElementById("goalsGrid").addEventListener("click", async function (e) {
+    var btn = e.target.closest("button[data-action]");
+    if (!btn) return;
+    var id = btn.getAttribute("data-id");
+    var goal = cachedGoals.find(function (g) { return g.id === id; });
+    var action = btn.getAttribute("data-action");
+
+    if (action === "contribute" && goal) {
+      openContributeModal(goal);
+    } else if (action === "edit-goal" && goal) {
+      openGoalModal(goal);
+    } else if (action === "delete-goal") {
+      if (confirm("Delete this goal? Money already contributed stays in your transaction history, but the goal card will be removed.")) {
+        try {
+          await deleteGoalApi(id);
+          await renderAll();
+        } catch (err) {
+          alert("Couldn't delete the goal. Is the FinanceAI server running?");
+          console.error(err);
+        }
+      }
+    }
+  });
+
+  // ---------- Init ----------
+  renderAll();
+})();
+</script>
+</body>
+</html>

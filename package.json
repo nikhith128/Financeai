@@ -1,0 +1,12 @@
+{
+  "name": "financeai-backend",
+  "version": "1.0.0",
+  "description": "FinanceAI personal finance tracker - Express + JSON file backend",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
