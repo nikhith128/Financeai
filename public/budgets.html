@@ -4,113 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FinanceAI - Budgets & Goals</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: Arial, Helvetica, sans-serif;
-    background: #f2f2f2;
-    color: #1a1a1a;
-    padding: 16px;
-  }
-  .app { max-width: 1100px; margin: 0 auto; }
-
-  nav.topnav { display: flex; gap: 14px; margin-bottom: 14px; font-size: 13px; }
-  nav.topnav a { color: #1a1a1a; text-decoration: none; border-bottom: 2px solid transparent; padding-bottom: 2px; }
-  nav.topnav a.active { border-bottom-color: #1a1a1a; font-weight: bold; }
-  nav.topnav span.future { color: #999; }
-
-  header {
-    display: flex; justify-content: space-between; align-items: center;
-    flex-wrap: wrap; gap: 10px; margin-bottom: 16px;
-  }
-  header h1 { font-size: 20px; }
-
-  button {
-    cursor: pointer; font-family: inherit; font-size: 14px;
-    padding: 8px 14px; border: 1px solid #333; background: #fff;
-    color: #1a1a1a; border-radius: 4px;
-  }
-  button:hover { background: #eee; }
-  button.primary { background: #1a1a1a; color: #fff; }
-  button.primary:hover { background: #333; }
-  button.small { padding: 3px 8px; font-size: 12px; }
-
-  section.panel {
-    background: #fff; border: 1px solid #ccc; border-radius: 6px;
-    padding: 14px; margin-bottom: 18px;
-  }
-  section.panel h2 { font-size: 15px; margin-bottom: 12px; }
-
-  /* Summary cards */
-  .summary-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px; }
-  .summary-card { background: #fff; border: 1px solid #ccc; border-radius: 6px; padding: 12px; }
-  .summary-card .label { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.03em; }
-  .summary-card .value { font-size: 20px; font-weight: bold; margin-top: 4px; }
-  .summary-card .value.negative { color: #b3261e; }
-
-  /* Budget rows */
-  .budget-row { margin-bottom: 14px; font-size: 13px; }
-  .budget-row-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
-  .budget-row-top .cat-name { font-weight: bold; }
-  .overspent-pill {
-    display: inline-block; font-size: 11px; color: #fff; background: #d9342b;
-    padding: 1px 6px; border-radius: 10px; margin-left: 6px;
-  }
-  .progress-track { background: #eee; border-radius: 4px; height: 9px; overflow: hidden; margin-bottom: 3px; }
-  .progress-fill { height: 100%; }
-  .progress-fill.green { background: #2e9e4f; }
-  .progress-fill.yellow { background: #e0a800; }
-  .progress-fill.red { background: #d9342b; }
-  .budget-row-bottom { display: flex; justify-content: space-between; color: #666; font-size: 12px; }
-  .no-budget-note { color: #999; font-style: italic; }
-
-  /* Goals grid */
-  .goals-grid {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px;
-  }
-  .goal-card {
-    border: 1px solid #ccc; border-radius: 6px; padding: 14px;
-    display: flex; gap: 12px; align-items: flex-start;
-  }
-  .goal-ring { flex-shrink: 0; }
-  .goal-info { flex: 1; min-width: 0; }
-  .goal-title { font-weight: bold; font-size: 14px; }
-  .goal-target-date { font-size: 11px; color: #888; margin-bottom: 6px; }
-  .goal-amounts { font-size: 13px; margin-bottom: 6px; }
-  .goal-milestone { font-size: 12px; color: #555; margin-bottom: 8px; }
-  .goal-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-  .empty-state { color: #888; font-size: 13px; padding: 6px 0; }
-
-  /* Modal */
-  .modal-overlay {
-    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.4);
-    display: flex; align-items: center; justify-content: center;
-    z-index: 100;
-  }
-  .modal-overlay.hidden { display: none; }
-  .modal {
-    background: #fff; border-radius: 6px; padding: 18px;
-    width: 100%; max-width: 360px; max-height: 90vh; overflow-y: auto;
-  }
-  .modal h2 { font-size: 16px; margin-bottom: 12px; }
-  .form-group { margin-bottom: 10px; }
-  .form-group label { display: block; font-size: 12px; color: #555; margin-bottom: 3px; }
-  .form-group input, .form-group select {
-    width: 100%; padding: 7px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px;
-  }
-  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
-  .error-msg { color: #b3261e; font-size: 12px; margin-top: 4px; display: none; }
-  .hidden { display: none; }
-
-  @media (max-width: 700px) {
-    .summary-strip { grid-template-columns: 1fr; }
-    .goals-grid { grid-template-columns: 1fr; }
-    .goal-card { flex-direction: column; align-items: center; text-align: center; }
-  }
-</style>
+<link rel="stylesheet" href="theme.css">
 </head>
 <body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="three-bg.js"></script>
 <div class="app">
 
   <nav class="topnav">

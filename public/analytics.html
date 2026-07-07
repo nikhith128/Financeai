@@ -5,63 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FinanceAI - Analytics & Insights</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: Arial, Helvetica, sans-serif;
-    background: #f2f2f2;
-    color: #1a1a1a;
-    padding: 16px;
-  }
-  .app { max-width: 1100px; margin: 0 auto; }
-
-  nav.topnav { display: flex; gap: 14px; margin-bottom: 14px; font-size: 13px; }
-  nav.topnav a { color: #1a1a1a; text-decoration: none; border-bottom: 2px solid transparent; padding-bottom: 2px; }
-  nav.topnav a.active { border-bottom-color: #1a1a1a; font-weight: bold; }
-  nav.topnav span.future { color: #999; }
-
-  header {
-    display: flex; justify-content: space-between; align-items: center;
-    flex-wrap: wrap; gap: 10px; margin-bottom: 16px;
-  }
-  header h1 { font-size: 20px; }
-  select, button {
-    font-family: inherit; font-size: 13px; padding: 7px 10px;
-    border: 1px solid #333; border-radius: 4px; background: #fff; color: #1a1a1a;
-  }
-  button { cursor: pointer; }
-  button:hover { background: #eee; }
-  button.tab.active { background: #1a1a1a; color: #fff; }
-
-  .chart-card {
-    background: #fff; border: 1px solid #ccc; border-radius: 6px;
-    padding: 14px; margin-bottom: 16px; position: relative; min-height: 260px;
-  }
-  .chart-card h2 { font-size: 14px; margin-bottom: 10px; }
-  .chart-card canvas { max-height: 220px; }
-  .empty-msg {
-    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-    color: #888; font-size: 13px; text-align: center; width: 80%;
-  }
-
-  .tab-row { display: flex; gap: 6px; margin-bottom: 10px; }
-
-  .insights-panel {
-    background: #fff; border: 1px solid #ccc; border-radius: 6px; padding: 14px;
-  }
-  .insights-panel h2 { font-size: 14px; margin-bottom: 10px; }
-  .insight-item {
-    font-size: 13px; padding: 8px 0; border-bottom: 1px solid #eee; display: flex; gap: 8px;
-  }
-  .insight-item:last-child { border-bottom: none; }
-  .insight-icon { flex-shrink: 0; }
-
-  @media (max-width: 700px) {
-    header { flex-direction: column; align-items: flex-start; }
-  }
-</style>
+<link rel="stylesheet" href="theme.css">
 </head>
 <body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="three-bg.js"></script>
 <div class="app">
 
   <nav class="topnav">
