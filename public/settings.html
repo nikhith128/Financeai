@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FinanceAI - Settings</title>
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="three-bg.js"></script>
+<div class="app">
+
+  <nav class="topnav">
+    <a href="dashboard.html">Dashboard</a>
+    <a href="transactions.html">Transactions</a>
+    <a href="budgets.html">Budgets &amp; Goals</a>
+    <a href="analytics.html">Analytics</a>
+    <a href="settings.html" class="active">Settings</a>
+  </nav>
+
+  <header>
+    <h1>Settings</h1>
+  </header>
+
+  <section class="panel" style="margin-bottom: 20px;">
+    <h2>Backup Your Data</h2>
+    <p style="font-size: 13px; color: var(--gray-light); margin-bottom: 14px; line-height: 1.6;">
+      This app stores data as plain JSON files on the server. On free hosting tiers (like Render's free plan),
+      those files can be wiped whenever the server restarts or redeploys. Download a backup regularly, and
+      keep it somewhere safe (your phone, a cloud drive) so you can restore it if that happens.
+    </p>
+    <button class="primary" id="btnExport">⬇ Download Backup</button>
+    <div id="exportStatus" style="font-size: 12px; color: var(--gray-light); margin-top: 10px;"></div>
+  </section>
+
+  <section class="panel" style="margin-bottom: 20px;">
+    <h2>Restore From Backup</h2>
+    <p style="font-size: 13px; color: var(--gray-light); margin-bottom: 14px; line-height: 1.6;">
+      Choose a backup file you downloaded earlier. This replaces <strong>all current data</strong>
+      (transactions, budgets, and goals) with what's in the file — anything logged since that backup was
+      taken will be lost.
+    </p>
+    <input type="file" id="restoreFileInput" accept="application/json" style="margin-bottom: 12px;">
+    <br>
+    <button class="primary" id="btnRestore" disabled>Restore This Backup</button>
+    <div class="error-msg" id="restoreError"></div>
+    <div id="restoreStatus" style="font-size: 12px; color: var(--gray-light); margin-top: 10px;"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Reset All Data</h2>
+    <p style="font-size: 13px; color: var(--gray-light); margin-bottom: 14px; line-height: 1.6;">
+      Wipes every transaction and goal, and resets budgets back to their defaults. This cannot be undone
+      unless you have a backup file to restore from.
+    </p>
+    <button id="btnReset">Reset Everything</button>
+    <div id="resetStatus" style="font-size: 12px; color: var(--gray-light); margin-top: 10px;"></div>
+  </section>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var API_BASE = "/api";
+
+  function formatTimestampForFilename(date) {
+    var pad = function (n) { return String(n).padStart(2, "0"); };
+    return date.getFullYear() + "-" + pad(date.getMonth() + 1) + "-" + pad(date.getDate()) +
+      "_" + pad(date.getHours()) + "-" + pad(date.getMinutes());
+  }
+
+  // ---------- Export ----------
+  var btnExport = document.getElementById("btnExport");
+  var exportStatus = document.getElementById("exportStatus");
+
+  btnExport.addEventListener("click", async function () {
+    exportStatus.textContent = "Preparing backup...";
+    try {
+      var res = await fetch(API_BASE + "/backup");
+      if (!res.ok) throw new Error("Request failed: " + res.status);
+      var data = await res.json();
+
+      var blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = "financeai-backup-" + formatTimestampForFilename(new Date()) + ".json";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      exportStatus.textContent = "Backup downloaded — " + data.transactions.length + " transaction(s), " +
+        data.goals.length + " goal(s) included.";
+    } catch (err) {
+      console.error(err);
+      exportStatus.textContent = "Couldn't create the backup. Is the FinanceAI server running?";
+    }
+  });
+
+  // ---------- Restore ----------
+  var restoreFileInput = document.getElementById("restoreFileInput");
+  var btnRestore = document.getElementById("btnRestore");
+  var restoreError = document.getElementById("restoreError");
+  var restoreStatus = document.getElementById("restoreStatus");
+  var selectedBackup = null;
+
+  restoreFileInput.addEventListener("change", function () {
+    restoreError.style.display = "none";
+    restoreStatus.textContent = "";
+    selectedBackup = null;
+    btnRestore.disabled = true;
+
+    var file = restoreFileInput.files[0];
+    if (!file) return;
+
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var parsed = JSON.parse(reader.result);
+        if (!Array.isArray(parsed.transactions) || typeof parsed.budgets !== "object" || parsed.budgets === null || !Array.isArray(parsed.goals)) {
+          throw new Error("This file doesn't look like a FinanceAI backup.");
+        }
+        selectedBackup = parsed;
+        btnRestore.disabled = false;
+        restoreStatus.textContent = "Ready to restore: " + parsed.transactions.length + " transaction(s), " +
+          parsed.goals.length + " goal(s)" + (parsed.exportedAt ? " (backed up " + new Date(parsed.exportedAt).toLocaleString("en-IN") + ")" : "") + ".";
+      } catch (err) {
+        restoreError.textContent = "Couldn't read this file: " + err.message;
+        restoreError.style.display = "block";
+      }
+    };
+    reader.onerror = function () {
+      restoreError.textContent = "Couldn't read this file.";
+      restoreError.style.display = "block";
+    };
+    reader.readAsText(file);
+  });
+
+  btnRestore.addEventListener("click", async function () {
+    if (!selectedBackup) return;
+    if (!confirm("This will replace ALL current transactions, budgets, and goals with the contents of this backup. Continue?")) return;
+
+    restoreError.style.display = "none";
+    restoreStatus.textContent = "Restoring...";
+    try {
+      var res = await fetch(API_BASE + "/backup/restore", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(selectedBackup)
+      });
+      if (!res.ok) throw new Error("Request failed: " + res.status);
+      restoreStatus.textContent = "Restored successfully. Reloading...";
+      setTimeout(function () { window.location.href = "dashboard.html"; }, 1200);
+    } catch (err) {
+      console.error(err);
+      restoreError.textContent = "Couldn't restore the backup. Is the FinanceAI server running?";
+      restoreError.style.display = "block";
+      restoreStatus.textContent = "";
+    }
+  });
+
+  // ---------- Reset ----------
+  var btnReset = document.getElementById("btnReset");
+  var resetStatus = document.getElementById("resetStatus");
+
+  btnReset.addEventListener("click", async function () {
+    if (!confirm("This will permanently delete every transaction and goal, and reset budgets to defaults. This cannot be undone. Continue?")) return;
+    if (!confirm("Are you absolutely sure? Type-to-confirm isn't required, but this really cannot be undone without a backup.")) return;
+
+    resetStatus.textContent = "Resetting...";
+    try {
+      var res = await fetch(API_BASE + "/backup", { method: "DELETE" });
+      if (!res.ok) throw new Error("Request failed: " + res.status);
+      resetStatus.textContent = "All data reset. Redirecting...";
+      setTimeout(function () { window.location.href = "dashboard.html"; }, 1200);
+    } catch (err) {
+      console.error(err);
+      resetStatus.textContent = "Couldn't reset data. Is the FinanceAI server running?";
+    }
+  });
+})();
+</script>
+</body>
+</html>

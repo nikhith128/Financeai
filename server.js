@@ -218,6 +218,35 @@ app.post("/api/goals/:id/contribute", (req, res) => {
   res.json({ goal: goals[idx], transaction: tx });
 });
 
+// ---------------- Backup / Restore ----------------
+
+app.get("/api/backup", (req, res) => {
+  res.json({
+    exportedAt: new Date().toISOString(),
+    transactions: readJSON(TX_FILE, []),
+    budgets: readJSON(BUDGETS_FILE, DEFAULT_BUDGETS),
+    goals: readJSON(GOALS_FILE, [])
+  });
+});
+
+app.post("/api/backup/restore", (req, res) => {
+  const body = req.body || {};
+  if (!Array.isArray(body.transactions) || typeof body.budgets !== "object" || body.budgets === null || !Array.isArray(body.goals)) {
+    return res.status(400).json({ error: "backup file must include transactions (array), budgets (object), and goals (array)" });
+  }
+  writeJSON(TX_FILE, body.transactions);
+  writeJSON(BUDGETS_FILE, body.budgets);
+  writeJSON(GOALS_FILE, body.goals);
+  res.json({ success: true });
+});
+
+app.delete("/api/backup", (req, res) => {
+  writeJSON(TX_FILE, []);
+  writeJSON(BUDGETS_FILE, DEFAULT_BUDGETS);
+  writeJSON(GOALS_FILE, []);
+  res.json({ success: true });
+});
+
 app.listen(PORT, () => {
   console.log("FinanceAI backend running at http://localhost:" + PORT);
 });
