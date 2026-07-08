@@ -73,6 +73,25 @@
     scene.add(mesh);
     shapes.push(mesh);
   }
+// Centerpiece sphere my edit
+var sphereGeometry = new THREE.IcosahedronGeometry(8, 1);
+
+var sphereMaterial = new THREE.MeshBasicMaterial({
+  color: 0xffffff,
+  wireframe: true,
+  transparent: true,
+  opacity: 0.08
+});
+
+var sphere = new THREE.Mesh(
+  sphereGeometry,
+  sphereMaterial
+);
+
+sphere.position.set(0, 0, -10);
+
+scene.add(sphere);
+
 
   function animate(time) {
     requestAnimationFrame(animate);
