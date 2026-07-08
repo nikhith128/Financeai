@@ -21,8 +21,7 @@
   --accent-expense: #ef4444;
   --accent-caution: #f59e0b;
 
-  --radius: 16px;
-  --radius-sm: 10px;
+
 }
 
 * { box-sizing: border-box; }
