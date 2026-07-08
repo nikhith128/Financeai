@@ -273,6 +273,13 @@
     var emptyMsg = document.getElementById("categoryEmptyMsg");
     var canvas = document.getElementById("categoryChart");
 
+    if (typeof Chart === "undefined") {
+      canvas.classList.add("hidden");
+      emptyMsg.textContent = "Chart library failed to load. Check your connection and reload the page.";
+      emptyMsg.classList.remove("hidden");
+      return;
+    }
+
     if (categoryChartInstance) {
       categoryChartInstance.destroy();
       categoryChartInstance = null;
@@ -339,6 +346,19 @@
     });
 
     var canvas = document.getElementById("trendChart");
+
+    if (typeof Chart === "undefined") {
+      canvas.style.display = "none";
+      if (!document.getElementById("trendChartFallbackMsg")) {
+        var fallbackMsg = document.createElement("div");
+        fallbackMsg.id = "trendChartFallbackMsg";
+        fallbackMsg.style.cssText = "text-align:center;color:var(--gray-light);font-size:13px;padding:60px 10px;";
+        fallbackMsg.textContent = "Chart library failed to load. Check your connection and reload the page.";
+        canvas.parentNode.appendChild(fallbackMsg);
+      }
+      return;
+    }
+
     if (trendChartInstance) {
       trendChartInstance.destroy();
       trendChartInstance = null;

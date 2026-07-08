@@ -103,6 +103,13 @@
     var canvas = document.getElementById("cashflowChart");
     var emptyMsg = document.getElementById("cashflowEmptyMsg");
 
+    if (typeof Chart === "undefined") {
+      canvas.classList.add("hidden");
+      emptyMsg.textContent = "Chart library failed to load. Check your connection and reload the page.";
+      emptyMsg.classList.remove("hidden");
+      return;
+    }
+
     if (transactions.length === 0) {
       canvas.classList.add("hidden");
       emptyMsg.classList.remove("hidden");
@@ -146,6 +153,13 @@
     var months = getTrailingMonths(monthCount);
     var canvas = document.getElementById("networthChart");
     var emptyMsg = document.getElementById("networthEmptyMsg");
+
+    if (typeof Chart === "undefined") {
+      canvas.classList.add("hidden");
+      emptyMsg.textContent = "Chart library failed to load. Check your connection and reload the page.";
+      emptyMsg.classList.remove("hidden");
+      return;
+    }
 
     if (transactions.length === 0) {
       canvas.classList.add("hidden");
@@ -291,6 +305,16 @@
   }
 
   function renderBreakdown(transactions) {
+    var canvas = document.getElementById("breakdownChart");
+    var emptyMsg = document.getElementById("breakdownEmptyMsg");
+
+    if (typeof Chart === "undefined") {
+      canvas.classList.add("hidden");
+      emptyMsg.textContent = "Chart library failed to load. Check your connection and reload the page.";
+      emptyMsg.classList.remove("hidden");
+      return;
+    }
+
     if (activeBreakdownTab === "day-of-week") {
       renderDayOfWeekChart(transactions);
     } else {
