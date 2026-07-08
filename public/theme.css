@@ -7,24 +7,18 @@
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
-  --void: #0a0a0C;
-  --charcoal: #17171a;
-  --charcoal-light: #202024;
-  --gray: #55555c;
-  --gray-light: #9a9aa1;
-  --ivory: #f3f1ea;
-  --ivory-dim: #cfcdc5;
+  --void: #07111f;
+  --charcoal: #10233d;
+  --charcoal-light: #18304f;
+  --gray: #5c7aa0;
+  --gray-light: #a8c1e6;
+  --ivory: #f4f8ff;
 
-  --panel-fill: rgba(255, 255, 255, 0.045);
-  --panel-fill-strong: rgba(255, 255, 255, 0.07);
-  --panel-border: rgba(255, 255, 255, 0.09);
-  --panel-shadow: 0 20px 60px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --accent-income: #4ade80;
+  --accent-expense: #f87171;
+  --accent-caution: #fbbf24;
+  --accent-transfer: #60a5fa;
 
-  --accent-income: #8fae9b;
-  --accent-expense: #c08b83;
-  --accent-caution: #cbae78;
-  --accent-transfer: #9a9aa1;
-  --accent-focus: #d9d6cb;
 
   --radius: 16px;
   --radius-sm: 10px;
