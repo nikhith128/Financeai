@@ -95,6 +95,8 @@ scene.add(sphere);
 
   function animate(time) {
     requestAnimationFrame(animate);
+sphere.rotation.y += 0.0015;
+sphere.rotation.x += 0.0005;
     for (var i = 0; i < shapes.length; i++) {
       var mesh = shapes[i];
       mesh.rotation.x += mesh.userData.rotSpeedX;
