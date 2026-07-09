@@ -9,6 +9,7 @@
 <body>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="three-bg.js"></script>
+<script src="card-tilt.js"></script>
 <div class="app">
 
   <nav class="topnav">
@@ -195,6 +196,30 @@
     return (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth());
   }
 
+  // ---------- Number count-up animation (same pattern as dashboard.html) ----------
+  var activeAnimations = new Map();
+  function animateValue(el, duration, renderFrame) {
+    if (!el) return;
+    if (activeAnimations.has(el)) {
+      cancelAnimationFrame(activeAnimations.get(el));
+      activeAnimations.delete(el);
+    }
+    var startTime = null;
+    function step(timestamp) {
+      if (startTime === null) startTime = timestamp;
+      var progress = Math.min((timestamp - startTime) / duration, 1);
+      var eased = 1 - Math.pow(1 - progress, 3);
+      renderFrame(eased);
+      if (progress < 1) {
+        activeAnimations.set(el, requestAnimationFrame(step));
+      } else {
+        renderFrame(1);
+        activeAnimations.delete(el);
+      }
+    }
+    activeAnimations.set(el, requestAnimationFrame(step));
+  }
+
   function populateSelect(select, options) {
     select.innerHTML = "";
     options.forEach(function (opt) {
@@ -255,18 +280,38 @@
           '<span class="cat-name">' + (CATEGORY_ICONS[cat] || "") + ' ' + cat + overPill + '</span>' +
           '<button class="small" data-action="edit-budget" data-category="' + cat + '">Edit</button>' +
         '</div>' +
-        '<div class="progress-track"><div class="progress-fill ' + colorClass + '" style="width:' + Math.min(pct, 100) + '%"></div></div>' +
+        '<div class="progress-track"><div class="progress-fill ' + colorClass + '" style="width:0%" data-target-width="' + Math.min(pct, 100) + '"></div></div>' +
         '<div class="budget-row-bottom"><span>' + formatCurrency(spent) + ' / ' + formatCurrency(limit) + ' spent</span><span>' + Math.round(pct) + '%</span></div>';
 
       listEl.appendChild(row);
     });
 
-    document.getElementById("sumAllocated").textContent = formatCurrency(totalAllocated);
-    document.getElementById("sumSpent").textContent = formatCurrency(totalSpent);
+    // Animate bars from 0% to their target width. Two rAFs ensure the browser
+    // has painted the 0% state first, so the CSS transition actually plays.
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        listEl.querySelectorAll(".progress-fill").forEach(function (el) {
+          el.style.width = el.getAttribute("data-target-width") + "%";
+        });
+      });
+    });
+
+    var allocatedEl = document.getElementById("sumAllocated");
+    animateValue(allocatedEl, 700, function (t) {
+      allocatedEl.textContent = formatCurrency(totalAllocated * t);
+    });
+
+    var spentEl = document.getElementById("sumSpent");
+    animateValue(spentEl, 700, function (t) {
+      spentEl.textContent = formatCurrency(totalSpent * t);
+    });
+
     var remaining = totalAllocated - totalSpent;
     var remainingEl = document.getElementById("sumRemaining");
-    remainingEl.textContent = formatCurrency(remaining);
     remainingEl.className = "value" + (remaining < 0 ? " negative" : "");
+    animateValue(remainingEl, 700, function (t) {
+      remainingEl.textContent = formatCurrency(remaining * t);
+    });
   }
 
   // ---------- Goals rendering ----------
@@ -275,14 +320,14 @@
     var circumference = 2 * Math.PI * r;
     var clamped = Math.max(0, Math.min(pct, 100));
     var offset = circumference * (1 - clamped / 100);
-    var color = pct >= 100 ? "#2e9e4f" : (pct >= 50 ? "#4c6ef5" : "#e0a800");
+    var color = pct >= 100 ? "#8fae9b" : (pct >= 50 ? "#d9d6cb" : "#cbae78");
     return (
       '<svg width="80" height="80" viewBox="0 0 80 80">' +
-        '<circle cx="40" cy="40" r="' + r + '" fill="none" stroke="#eee" stroke-width="8"></circle>' +
-        '<circle cx="40" cy="40" r="' + r + '" fill="none" stroke="' + color + '" stroke-width="8" ' +
-          'stroke-dasharray="' + circumference + '" stroke-dashoffset="' + offset + '" ' +
+        '<circle cx="40" cy="40" r="' + r + '" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="8"></circle>' +
+        '<circle class="goal-ring-progress" cx="40" cy="40" r="' + r + '" fill="none" stroke="' + color + '" stroke-width="8" ' +
+          'stroke-dasharray="' + circumference + '" stroke-dashoffset="' + circumference + '" data-target-offset="' + offset + '" ' +
           'stroke-linecap="round" transform="rotate(-90 40 40)"></circle>' +
-        '<text x="40" y="45" text-anchor="middle" font-size="15" font-weight="bold" fill="#1a1a1a">' + Math.round(pct) + '%</text>' +
+        '<text class="goal-ring-text" data-target-pct="' + clamped + '" x="40" y="45" text-anchor="middle" font-size="15" font-weight="bold" fill="#f3f1ea">0%</text>' +
       '</svg>'
     );
   }
@@ -330,6 +375,22 @@
           '</div>' +
         '</div>';
       grid.appendChild(card);
+    });
+
+    // Animate rings from 0% to their target, and count up the percentage text
+    // to match. Double rAF ensures the browser paints the 0% state first.
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        grid.querySelectorAll(".goal-ring-progress").forEach(function (el) {
+          el.style.strokeDashoffset = el.getAttribute("data-target-offset");
+        });
+        grid.querySelectorAll(".goal-ring-text").forEach(function (el) {
+          var target = parseFloat(el.getAttribute("data-target-pct"));
+          animateValue(el, 900, function (t) {
+            el.textContent = Math.round(target * t) + "%";
+          });
+        });
+      });
     });
   }
 

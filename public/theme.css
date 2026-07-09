@@ -66,15 +66,28 @@ nav.topnav a {
   text-decoration: none;
   border-bottom: 2px solid transparent;
   padding-bottom: 4px;
-  transition: color 0.2s ease, border-color 0.2s ease;
+  transition: color 0.2s ease;
   font-family: 'Inter', sans-serif;
   letter-spacing: 0.03em;
   text-transform: uppercase;
   font-size: 11px;
   font-weight: 600;
+  position: relative;
 }
+nav.topnav a::after {
+  content: "";
+  position: absolute;
+  left: 0; bottom: -2px;
+  width: 100%; height: 2px;
+  background: var(--ivory);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.25s ease;
+}
+nav.topnav a:hover::after { transform: scaleX(1); }
+nav.topnav a.active::after { transform: scaleX(1); }
 nav.topnav a:hover { color: var(--ivory); }
-nav.topnav a.active { color: var(--ivory); border-bottom-color: var(--ivory); }
+nav.topnav a.active { color: var(--ivory); }
 nav.topnav span.future {
   color: #4a4a50;
   font-size: 11px;
@@ -113,7 +126,7 @@ button {
   transition: background 0.2s ease, transform 0.15s ease, border-color 0.2s ease;
 }
 button:hover { background: var(--panel-fill-strong); border-color: rgba(255,255,255,0.18); transform: translateY(-1px); }
-button:active { transform: translateY(0); }
+button:active { transform: translateY(0) scale(0.97); }
 button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 button:disabled:hover { background: var(--panel-fill); border-color: var(--panel-border); }
 
@@ -173,7 +186,7 @@ input:disabled { opacity: 0.6; }
 
 /* ---------------- Mid grid / charts ---------------- */
 .mid-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; }
-.chart-card { padding: 16px; min-height: 260px; position: relative; margin-bottom: 16px; }
+.chart-card { padding: 16px; min-height: 260px; position: relative; margin-bottom: 16px; transition: transform 0.15s ease-out; }
 .chart-canvas-wrap { position: relative; height: 230px; width: 100%; }
 .chart-card .empty-msg {
   position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
@@ -182,7 +195,7 @@ input:disabled { opacity: 0.6; }
 
 /* ---------------- Lower grid ---------------- */
 .lower-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
-.panel { padding: 16px; }
+.panel { padding: 16px; transition: transform 0.15s ease-out; }
 .quick-actions button { width: 100%; margin-bottom: 8px; text-align: left; }
 
 /* ---------------- Recent transactions / ledger rows ---------------- */
@@ -211,7 +224,7 @@ input:disabled { opacity: 0.6; }
   padding: 2px 8px; border-radius: 10px; margin-left: 6px; font-weight: 600;
 }
 .progress-track { background: rgba(255,255,255,0.06); border-radius: 6px; height: 8px; overflow: hidden; margin-bottom: 4px; }
-.progress-fill { height: 100%; border-radius: 6px; }
+.progress-fill { height: 100%; border-radius: 6px; transition: width 0.7s cubic-bezier(0.22, 1, 0.36, 1); }
 .progress-fill.green { background: var(--accent-income); }
 .progress-fill.yellow { background: var(--accent-caution); }
 .progress-fill.red { background: var(--accent-expense); }
@@ -220,7 +233,7 @@ input:disabled { opacity: 0.6; }
 
 /* ---------------- Summary strip (budgets page) ---------------- */
 .summary-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 18px; }
-.summary-card { padding: 16px; }
+.summary-card { padding: 16px; transition: transform 0.15s ease-out; }
 .summary-card .label { font-size: 11px; color: var(--gray-light); text-transform: uppercase; letter-spacing: 0.06em; }
 .summary-card .value { font-size: 22px; font-weight: 700; margin-top: 6px; font-family: 'Playfair Display', serif; color: var(--ivory); }
 .summary-card .value.negative { color: var(--accent-expense); }
@@ -232,6 +245,7 @@ section.panel { margin-bottom: 20px; }
 .goal-card { padding: 16px; display: flex; gap: 14px; align-items: flex-start; transition: transform 0.2s ease; }
 .goal-card:hover { transform: translateY(-2px); }
 .goal-ring { flex-shrink: 0; }
+.goal-ring-progress { transition: stroke-dashoffset 0.9s cubic-bezier(0.16, 1, 0.3, 1); }
 .goal-info { flex: 1; min-width: 0; }
 .goal-title { font-size: 15px; color: var(--ivory); }
 .goal-target-date { font-size: 11px; color: var(--gray-light); margin-bottom: 6px; }
@@ -308,7 +322,41 @@ section.panel { margin-bottom: 20px; }
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.app { animation: pageFadeIn 0.4s ease-out; }
+.app { animation: pageFadeIn 0.35s ease-out; }
+
+@keyframes cardFadeInUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.kpi-card, .chart-card, .panel, .summary-card, .goal-card,
+.ledger-panel, .filter-bar, .insights-panel, section.panel {
+  animation: cardFadeInUp 0.5s ease-out both;
+}
+.kpi-strip > .kpi-card:nth-child(1) { animation-delay: 0.02s; }
+.kpi-strip > .kpi-card:nth-child(2) { animation-delay: 0.08s; }
+.kpi-strip > .kpi-card:nth-child(3) { animation-delay: 0.14s; }
+.kpi-strip > .kpi-card:nth-child(4) { animation-delay: 0.20s; }
+.mid-grid > .chart-card:nth-child(1) { animation-delay: 0.16s; }
+.mid-grid > .chart-card:nth-child(2) { animation-delay: 0.22s; }
+.lower-grid > .panel:nth-child(1) { animation-delay: 0.26s; }
+.lower-grid > .panel:nth-child(2) { animation-delay: 0.32s; }
+.lower-grid > .panel:nth-child(3) { animation-delay: 0.38s; }
+.summary-strip > .summary-card:nth-child(1) { animation-delay: 0.02s; }
+.summary-strip > .summary-card:nth-child(2) { animation-delay: 0.08s; }
+.summary-strip > .summary-card:nth-child(3) { animation-delay: 0.14s; }
+.goals-grid > .goal-card:nth-child(1) { animation-delay: 0.02s; }
+.goals-grid > .goal-card:nth-child(2) { animation-delay: 0.08s; }
+.goals-grid > .goal-card:nth-child(3) { animation-delay: 0.14s; }
+.goals-grid > .goal-card:nth-child(4) { animation-delay: 0.20s; }
+.ledger-panel, .filter-bar, .insights-panel, section.panel { animation-delay: 0.1s; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-delay: 0s !important;
+    transition-duration: 0.001ms !important;
+  }
+}
 
 /* ---------------- Modal ---------------- */
 .modal-overlay {

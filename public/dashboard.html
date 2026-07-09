@@ -10,6 +10,7 @@
 <body>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="three-bg.js"></script>
+<script src="card-tilt.js"></script>
 <div class="app">
 
   <nav class="topnav">
@@ -237,6 +238,34 @@
   }
 
   // ---------- KPI rendering ----------
+  // ---------- Number count-up animation ----------
+  // Keyed by element so re-rendering (e.g. after adding a transaction) cleanly
+  // cancels any animation still in progress on that element instead of
+  // stacking multiple rAF loops on top of each other.
+  var activeAnimations = new Map();
+
+  function animateValue(el, duration, renderFrame) {
+    if (!el) return;
+    if (activeAnimations.has(el)) {
+      cancelAnimationFrame(activeAnimations.get(el));
+      activeAnimations.delete(el);
+    }
+    var startTime = null;
+    function step(timestamp) {
+      if (startTime === null) startTime = timestamp;
+      var progress = Math.min((timestamp - startTime) / duration, 1);
+      var eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+      renderFrame(eased);
+      if (progress < 1) {
+        activeAnimations.set(el, requestAnimationFrame(step));
+      } else {
+        renderFrame(1); // guarantee exact final value, no floating-point drift
+        activeAnimations.delete(el);
+      }
+    }
+    activeAnimations.set(el, requestAnimationFrame(step));
+  }
+
   function renderKPIs(transactions) {
     var now = new Date();
     var netBalance = 0;
@@ -257,13 +286,27 @@
     var netSavings = monthlyIncome - monthlyExpenses;
     var savingsRate = monthlyIncome > 0 ? (netSavings / monthlyIncome) * 100 : 0;
 
-    document.getElementById("kpiBalance").textContent = formatCurrency(netBalance);
-    document.getElementById("kpiBalance").className = "value " + (netBalance >= 0 ? "positive" : "negative");
-    document.getElementById("kpiIncome").textContent = formatCurrency(monthlyIncome);
-    document.getElementById("kpiExpenses").textContent = formatCurrency(monthlyExpenses);
-    document.getElementById("kpiSavings").textContent =
-      formatCurrency(netSavings) + " / " + Math.round(savingsRate) + "%";
-    document.getElementById("kpiSavings").className = "value " + (netSavings >= 0 ? "positive" : "negative");
+    var balanceEl = document.getElementById("kpiBalance");
+    balanceEl.className = "value " + (netBalance >= 0 ? "positive" : "negative");
+    animateValue(balanceEl, 700, function (t) {
+      balanceEl.textContent = formatCurrency(netBalance * t);
+    });
+
+    var incomeEl = document.getElementById("kpiIncome");
+    animateValue(incomeEl, 700, function (t) {
+      incomeEl.textContent = formatCurrency(monthlyIncome * t);
+    });
+
+    var expensesEl = document.getElementById("kpiExpenses");
+    animateValue(expensesEl, 700, function (t) {
+      expensesEl.textContent = formatCurrency(monthlyExpenses * t);
+    });
+
+    var savingsEl = document.getElementById("kpiSavings");
+    savingsEl.className = "value " + (netSavings >= 0 ? "positive" : "negative");
+    animateValue(savingsEl, 700, function (t) {
+      savingsEl.textContent = formatCurrency(netSavings * t) + " / " + Math.round(savingsRate * t) + "%";
+    });
   }
 
   // ---------- Category breakdown chart ----------
@@ -490,9 +533,19 @@
           '<span>' + (CATEGORY_ICONS[item.category] || "") + ' ' + item.category + overPill + '</span>' +
           '<span>' + formatCurrency(item.spent) + ' / ' + formatCurrency(item.limit) + '</span>' +
         '</div>' +
-        '<div class="progress-track"><div class="progress-fill ' + colorClass + '" style="width:' +
-          Math.min(item.pct, 100) + '%"></div></div>';
+        '<div class="progress-track"><div class="progress-fill ' + colorClass + '" style="width:0%" data-target-width="' +
+          Math.min(item.pct, 100) + '"></div></div>';
       container.appendChild(div);
+    });
+
+    // Animate bars from 0% to their target width. Two rAFs ensure the browser
+    // has painted the 0% state first, so the CSS transition actually plays.
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        container.querySelectorAll(".progress-fill").forEach(function (el) {
+          el.style.width = el.getAttribute("data-target-width") + "%";
+        });
+      });
     });
   }
 

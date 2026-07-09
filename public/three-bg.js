@@ -1,7 +1,7 @@
-/* FinanceAI — subtle floating wireframe background (Three.js)
+/* FinanceAI — floating wireframe background (Three.js)
    Loaded on every page after the Three.js CDN script. Renders a handful of
-   slowly rotating, slowly drifting wireframe polyhedra in soft ivory, at very
-   low opacity, on a fixed full-viewport canvas behind the glass panels. */
+   slowly rotating, slowly drifting wireframe polyhedra in soft ivory on a
+   fixed full-viewport canvas behind the glass panels. */
 (function () {
   "use strict";
 
@@ -39,12 +39,12 @@
   renderer.setClearColor(0x000000, 0);
 
   var isSmallScreen = window.innerWidth < 700;
-  var shapeCount = isSmallScreen ? 5 : 10;
+  var shapeCount = isSmallScreen ? 6 : 12;
 
   var geometries = [
-    new THREE.IcosahedronGeometry(4, 0),
-    new THREE.DodecahedronGeometry(3.2, 0),
-    new THREE.OctahedronGeometry(3.6, 0)
+    new THREE.IcosahedronGeometry(4.6, 0),
+    new THREE.DodecahedronGeometry(3.7, 0),
+    new THREE.OctahedronGeometry(4.1, 0)
   ];
 
   var shapes = [];
@@ -54,7 +54,7 @@
       color: 0xf3f1ea,
       wireframe: true,
       transparent: true,
-      opacity: 0.05 + Math.random() * 0.05
+      opacity: 0.16 + Math.random() * 0.14
     });
     var mesh = new THREE.Mesh(geo, material);
 
@@ -73,30 +73,9 @@
     scene.add(mesh);
     shapes.push(mesh);
   }
-// Centerpiece sphere my edit
-var sphereGeometry = new THREE.IcosahedronGeometry(8, 1);
-
-var sphereMaterial = new THREE.MeshBasicMaterial({
-  color: 0xffffff,
-  wireframe: true,
-  transparent: true,
-  opacity: 0.08
-});
-
-var sphere = new THREE.Mesh(
-  sphereGeometry,
-  sphereMaterial
-);
-
-sphere.position.set(0, 0, -10);
-
-scene.add(sphere);
-
 
   function animate(time) {
     requestAnimationFrame(animate);
-sphere.rotation.y += 0.0015;
-sphere.rotation.x += 0.0005;
     for (var i = 0; i < shapes.length; i++) {
       var mesh = shapes[i];
       mesh.rotation.x += mesh.userData.rotSpeedX;
