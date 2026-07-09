@@ -50,12 +50,12 @@
   <section class="mid-grid">
     <div class="chart-card">
       <h2>Category Spending Breakdown (This Month)</h2>
-      <canvas id="categoryChart"></canvas>
+      <div class="chart-canvas-wrap"><canvas id="categoryChart"></canvas></div>
       <div class="empty-msg hidden" id="categoryEmptyMsg">No expenses logged this month yet.</div>
     </div>
     <div class="chart-card">
       <h2>Monthly Cash Flow Trend (Last 6 Months)</h2>
-      <canvas id="trendChart"></canvas>
+      <div class="chart-canvas-wrap"><canvas id="trendChart"></canvas></div>
     </div>
   </section>
 
@@ -304,6 +304,7 @@
       },
       options: {
         responsive: true,
+        maintainAspectRatio: false,
         plugins: {
           legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } },
           tooltip: {
@@ -375,6 +376,7 @@
       },
       options: {
         responsive: true,
+        maintainAspectRatio: false,
         plugins: {
           legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } }
         },

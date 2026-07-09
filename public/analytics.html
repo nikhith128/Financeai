@@ -30,13 +30,13 @@
 
   <div class="chart-card">
     <h2>Income vs. Expense Trend</h2>
-    <canvas id="cashflowChart"></canvas>
+    <div class="chart-canvas-wrap"><canvas id="cashflowChart"></canvas></div>
     <div class="empty-msg hidden" id="cashflowEmptyMsg">No transactions yet — this chart will fill in as you log income and expenses.</div>
   </div>
 
   <div class="chart-card">
     <h2>Net Worth Trajectory</h2>
-    <canvas id="networthChart"></canvas>
+    <div class="chart-canvas-wrap"><canvas id="networthChart"></canvas></div>
     <div class="empty-msg hidden" id="networthEmptyMsg">No transactions yet — your net worth trend will show up here.</div>
   </div>
 
@@ -45,7 +45,7 @@
       <button class="tab active" id="tabDayOfWeek" type="button">Spending by Day of Week</button>
       <button class="tab" id="tabCategoryCompare" type="button">Category Comparison (Current vs 3-Mo Avg)</button>
     </div>
-    <canvas id="breakdownChart"></canvas>
+    <div class="chart-canvas-wrap"><canvas id="breakdownChart"></canvas></div>
     <div class="empty-msg hidden" id="breakdownEmptyMsg">Not enough expense data yet for this breakdown.</div>
   </div>
 
@@ -142,6 +142,7 @@
       },
       options: {
         responsive: true,
+        maintainAspectRatio: false,
         plugins: { legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } } },
         scales: { y: { beginAtZero: true, ticks: { font: { size: 10 } } }, x: { ticks: { font: { size: 10 } } } }
       }
@@ -193,6 +194,7 @@
       },
       options: {
         responsive: true,
+        maintainAspectRatio: false,
         plugins: { legend: { display: false } },
         scales: { y: { ticks: { font: { size: 10 } } }, x: { ticks: { font: { size: 10 } } } }
       }
@@ -242,6 +244,7 @@
       },
       options: {
         responsive: true,
+        maintainAspectRatio: false,
         plugins: { legend: { display: false } },
         scales: { y: { beginAtZero: true, ticks: { font: { size: 10 } } }, x: { ticks: { font: { size: 10 } } } }
       }
@@ -298,6 +301,7 @@
       },
       options: {
         responsive: true,
+        maintainAspectRatio: false,
         plugins: { legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } } },
         scales: { y: { beginAtZero: true, ticks: { font: { size: 10 } } }, x: { ticks: { font: { size: 10 } } } }
       }
