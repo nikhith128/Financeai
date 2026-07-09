@@ -136,6 +136,15 @@
 (function () {
   "use strict";
 
+  // Theme Chart.js for the dark Ink Wash palette — the library's defaults
+  // (#666 text, near-black gridlines) are built for light backgrounds and
+  // are barely legible here otherwise.
+  if (typeof Chart !== "undefined") {
+    Chart.defaults.color = "#cfcdc5";
+    Chart.defaults.borderColor = "rgba(255,255,255,0.09)";
+    Chart.defaults.font.family = "'Inter', sans-serif";
+  }
+
   // ---------- Constants ----------
   var EXPENSE_CATEGORIES = ["Food", "Rent", "Transport", "Entertainment", "Utilities", "Shopping", "Health", "Other"];
   var INCOME_CATEGORIES = ["Salary", "Freelance", "Investment", "Other Income"];
