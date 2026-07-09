@@ -73,9 +73,30 @@
     scene.add(mesh);
     shapes.push(mesh);
   }
+// Centerpiece sphere my edit
+var sphereGeometry = new THREE.IcosahedronGeometry(8, 1);
+
+var sphereMaterial = new THREE.MeshBasicMaterial({
+  color: 0xffffff,
+  wireframe: true,
+  transparent: true,
+  opacity: 0.08
+});
+
+var sphere = new THREE.Mesh(
+  sphereGeometry,
+  sphereMaterial
+);
+
+sphere.position.set(0, 0, -10);
+
+scene.add(sphere);
+
 
   function animate(time) {
     requestAnimationFrame(animate);
+sphere.rotation.y += 0.0015;
+sphere.rotation.x += 0.0005;
     for (var i = 0; i < shapes.length; i++) {
       var mesh = shapes[i];
       mesh.rotation.x += mesh.userData.rotSpeedX;
