@@ -53,6 +53,19 @@ On Termux (Android), same steps — just make sure Node.js is installed (`pkg in
 | PUT | /api/goals/:id | `{title, targetAmount, targetDate}` | |
 | DELETE | /api/goals/:id | — | |
 | POST | /api/goals/:id/contribute | `{amount, account}` | atomically increases the goal's `savedAmount` **and** logs a `transfer` transaction — this is why Contribute doesn't need a separate transaction API call from the frontend |
+| GET | /api/backup | — | returns `{exportedAt, transactions, budgets, goals}` — everything in one object |
+| POST | /api/backup/restore | `{transactions, budgets, goals}` | overwrites all three data files with the given content |
+| DELETE | /api/backup | — | wipes all data back to empty/default state |
+
+## Backup & Restore (important on free hosting tiers)
+
+Free tiers on hosts like Render don't guarantee your `data/*.json` files survive a redeploy or restart — the filesystem can reset. To protect against that, there's a **Settings** page (`settings.html`) with:
+
+- **Download Backup** — exports everything (transactions, budgets, goals) as one `.json` file you save locally
+- **Restore From Backup** — upload a previously downloaded backup file to replace all current data
+- **Reset Everything** — wipes all data back to a clean slate (double-confirmed, since it's irreversible without a backup)
+
+Get in the habit of downloading a backup after any real session of data entry, especially before pushing changes that trigger a redeploy.
 
 ## What changed from the localStorage version
 

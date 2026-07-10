@@ -46,9 +46,6 @@ function generateId() {
 }
 
 app.use(express.json());
-app.get("/", (req, res) => {
-  res.redirect("/dashboard.html");
-});
 
 app.use(express.static(path.join(__dirname, "public")));
 

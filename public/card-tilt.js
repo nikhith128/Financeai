@@ -12,7 +12,7 @@
     return;
   }
 
-  var TILT_SELECTOR = ".kpi-card, .chart-card, .summary-card, .goal-card, .panel";
+  var TILT_SELECTOR = ".kpi-card, .chart-card, .summary-card, .goal-card, .panel, .preview-card";
   var MAX_TILT_DEG = 5;
 
   var currentEl = null;
