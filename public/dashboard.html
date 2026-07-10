@@ -8,6 +8,19 @@
 <link rel="stylesheet" href="theme.css">
 </head>
 <body>
+  <script>
+  fetch('/api/auth/me')
+    .then(res => res.json())
+    .then(data => {
+      if (!data.loggedIn) {
+        window.location.href = '/login.html';
+      }
+    })
+    .catch(() => {
+      window.location.href = '/login.html';
+    });
+</script>
+  
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="three-bg.js"></script>
 <script src="card-tilt.js"></script>
@@ -21,13 +34,14 @@
     <a href="analytics.html">Analytics</a>
     <a href="/ai.html">AI Assistant</a>
     <a href="settings.html">Settings</a>
+    <a href="#" onclick="logout()">Log Out</a>
   </nav>
 
   <header>
     <div>
       <h1>FinanceAI Dashboard</h1>
       <div class="sub" id="todayLabel"></div>
-    </div>
+    </div>  
     <button class="primary" id="btnAddTop">+ Add Transaction</button>
   </header>
 
@@ -747,6 +761,11 @@
   setType("expense");
   renderAll();
 })();
+<script>
+  function logout(){
+    fetch('/api/auth/logout', { method: 'POST' })
+      .then(() => window.location.href = '/login.html');
+  }
 </script>
 </body>
 </html>
