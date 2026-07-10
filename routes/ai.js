@@ -1,8 +1,8 @@
+
 const express = require('express');
 const router = express.Router();
 
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
-
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent';
 async function askGemini(prompt) {
   const res = await fetch(`${GEMINI_URL}?key=${process.env.GEMINI_API_KEY}`, {
     method: 'POST',
@@ -12,6 +12,7 @@ async function askGemini(prompt) {
     })
   });
   const data = await res.json();
+  console.log('GEMINI RAW RESPONSE:', JSON.stringify(data, null, 2));
   return data?.candidates?.[0]?.content?.parts?.[0]?.text || 'No response.';
 }
 
