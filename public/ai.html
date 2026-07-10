@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Assistant — FinanceAI</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink-0:#0a0a0c; --ink-1:#131316; --ink-2:#1b1b1f;
+    --line: rgba(255,255,255,0.08);
+    --text-hi:#f2efe9; --text-lo:#8c8a86;
+    --gold:#d4af7a;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--ink-0); color:var(--text-hi);
+    font-family:'Inter', sans-serif; min-height:100vh;
+    padding:24px 16px 60px;
+  }
+  .top{ display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; }
+  .back{ color:var(--text-lo); text-decoration:none; font-size:14px; }
+  h1{ font-family:'Playfair Display', serif; font-size:28px; margin:0 0 6px; }
+  .sub{ color:var(--text-lo); font-size:14px; margin-bottom:28px; }
+
+  .card{
+    background: linear-gradient(180deg, var(--ink-2), var(--ink-1));
+    border:1px solid var(--line); border-radius:16px;
+    padding:22px; margin-bottom:20px;
+  }
+  .card h2{ font-size:15px; margin:0 0 14px; color:var(--gold); text-transform:uppercase; letter-spacing:0.05em; }
+
+  .insight-text{ font-size:15px; line-height:1.6; color:var(--text-hi); white-space:pre-wrap; }
+  .placeholder{ color:var(--text-lo); font-size:14px; }
+
+  button{
+    background: var(--gold); color:#1a1a1a; border:none;
+    padding:12px 20px; border-radius:10px; font-weight:600; font-size:14px;
+    cursor:pointer; width:100%;
+  }
+  button:disabled{ opacity:0.5; }
+
+  .chat-log{ max-height:340px; overflow-y:auto; margin-bottom:14px; }
+  .msg{ margin-bottom:14px; font-size:14px; line-height:1.5; }
+  .msg.user{ color:var(--text-hi); text-align:right; }
+  .msg.ai{ color:var(--text-hi); background: rgba(212,175,122,0.08); border-left:3px solid var(--gold); padding:10px 14px; border-radius:0 10px 10px 10px; }
+
+  .chat-input-row{ display:flex; gap:8px; }
+  textarea{
+    flex:1; background: rgba(0,0,0,0.3); border:1px solid var(--line); color:var(--text-hi);
+    border-radius:10px; padding:12px; font-family:'Inter', sans-serif; font-size:14px; resize:none;
+  }
+  .send-btn{ width:auto; padding:0 20px; }
+</style>
+</head>
+<body>
+
+  <div class="top">
+    <a href="/dashboard.html" class="back">← Back to Dashboard</a>
+  </div>
+
+  <h1>AI Assistant</h1>
+  <div class="sub">Ask about your spending, or get an instant summary of your finances.</div>
+
+  <div class="card">
+    <h2>Insights</h2>
+    <div id="insight-output" class="placeholder">Tap below to generate an AI summary of your spending.</div>
+    <br>
+    <button id="insight-btn">Generate Insights</button>
+  </div>
+
+  <div class="card">
+    <h2>Chat</h2>
+    <div id="chat-log" class="chat-log"></div>
+    <div class="chat-input-row">
+      <textarea id="chat-input" rows="2" placeholder="e.g. How much did I spend on food this month?"></textarea>
+      <button id="chat-send" class="send-btn">Send</button>
+    </div>
+  </div>
+
+<script>
+  async function getTransactions(){
+    try{
+      const res = await fetch('/api/transactions');
+      return await res.json();
+    }catch(e){ return []; }
+  }
+
+  const insightBtn = document.getElementById('insight-btn');
+  const insightOutput = document.getElementById('insight-output');
+  insightBtn.addEventListener('click', async () => {
+    insightBtn.disabled = true;
+    insightBtn.textContent = 'Thinking...';
+    insightOutput.textContent = 'Analyzing your transactions...';
+    insightOutput.classList.remove('placeholder');
+    try{
+      const transactions = await getTransactions();
+      const res = await fetch('/api/ai/insights', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ transactions })
+      });
+      const data = await res.json();
+      insightOutput.textContent = data.insight || 'No insight returned.';
+    }catch(e){
+      insightOutput.textContent = 'Something went wrong. Try again.';
+    }
+    insightBtn.disabled = false;
+    insightBtn.textContent = 'Generate Insights';
+  });
+
+  const chatLog = document.getElementById('chat-log');
+  const chatInput = document.getElementById('chat-input');
+  const chatSend = document.getElementById('chat-send');
+
+  function addMsg(text, cls){
+    const div = document.createElement('div');
+    div.className = 'msg ' + cls;
+    div.textContent = text;
+    chatLog.appendChild(div);
+    chatLog.scrollTop = chatLog.scrollHeight;
+  }
+
+  async function sendChat(){
+    const message = chatInput.value.trim();
+    if(!message) return;
+    addMsg(message, 'user');
+    chatInput.value = '';
+    chatSend.disabled = true;
+    addMsg('Thinking...', 'ai');
+    try{
+      const transactions = await getTransactions();
+      const res = await fetch('/api/ai/chat', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ message, transactions })
+      });
+      const data = await res.json();
+      chatLog.lastChild.textContent = data.reply || 'No response.';
+    }catch(e){
+      chatLog.lastChild.textContent = 'Something went wrong. Try again.';
+    }
+    chatSend.disabled = false;
+  }
+
+  chatSend.addEventListener('click', sendChat);
+  chatInput.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter' && !e.shiftKey){
+      e.preventDefault();
+      sendChat();
+    }
+  });
+</script>
+
+</body>
+</html>
