@@ -30,7 +30,12 @@
   }
   .card h2{ font-size:15px; margin:0 0 14px; color:var(--gold); text-transform:uppercase; letter-spacing:0.05em; }
 
-  .insight-text{ font-size:15px; line-height:1.6; color:var(--text-hi); white-space:pre-wrap; }
+  .insight-text{ font-size:15px; line-height:1.7; color:var(--text-hi); }
+  .insight-text h3{ font-family:'Playfair Display', serif; font-size:18px; margin:18px 0 8px; color:var(--gold); }
+  .insight-text h3:first-child{ margin-top:0; }
+  .insight-text ul{ margin:8px 0; padding-left:20px; }
+  .insight-text li{ margin-bottom:6px; }
+  .insight-text strong{ color:var(--gold); font-weight:600; }
   .placeholder{ color:var(--text-lo); font-size:14px; }
 
   button{
@@ -40,10 +45,29 @@
   }
   button:disabled{ opacity:0.5; }
 
-  .chat-log{ max-height:340px; overflow-y:auto; margin-bottom:14px; }
-  .msg{ margin-bottom:14px; font-size:14px; line-height:1.5; }
-  .msg.user{ color:var(--text-hi); text-align:right; }
-  .msg.ai{ color:var(--text-hi); background: rgba(212,175,122,0.08); border-left:3px solid var(--gold); padding:10px 14px; border-radius:0 10px 10px 10px; }
+  .chat-log{ max-height:380px; overflow-y:auto; margin-bottom:14px; display:flex; flex-direction:column; gap:12px; }
+  .msg-row{ display:flex; }
+  .msg-row.user{ justify-content:flex-end; }
+  .msg-row.ai{ justify-content:flex-start; }
+
+  .bubble{
+    max-width:82%; font-size:14px; line-height:1.55; padding:10px 14px;
+    border-radius:14px;
+  }
+  .bubble.user{
+    background: rgba(255,255,255,0.06);
+    border:1px solid var(--line);
+    color:var(--text-hi);
+    border-radius:14px 14px 4px 14px;
+  }
+  .bubble.ai{
+    background: rgba(212,175,122,0.08);
+    border-left:3px solid var(--gold);
+    color:var(--text-hi);
+    border-radius:0 14px 14px 14px;
+  }
+  .bubble.ai strong{ color:var(--gold); }
+  .bubble.ai ul{ margin:6px 0; padding-left:18px; }
 
   .chat-input-row{ display:flex; gap:8px; }
   textarea{
@@ -79,6 +103,37 @@
   </div>
 
 <script>
+  // ---------- tiny markdown renderer (bold, headers, bullets) ----------
+  function renderMarkdown(text){
+    if(!text) return '';
+    let html = text
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    // headers: ### Heading  ->  <h3>Heading</h3>
+    html = html.replace(/^###\s?(.+)$/gm, '<h3>$1</h3>');
+    html = html.replace(/^##\s?(.+)$/gm, '<h3>$1</h3>');
+
+    // bold: **text** -> <strong>text</strong>
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+    // bullet lines starting with * or -
+    const lines = html.split('\n');
+    let out = [];
+    let inList = false;
+    for(const line of lines){
+      const bulletMatch = line.match(/^\s*[\*\-]\s+(.+)$/);
+      if(bulletMatch){
+        if(!inList){ out.push('<ul>'); inList = true; }
+        out.push('<li>' + bulletMatch[1] + '</li>');
+      } else {
+        if(inList){ out.push('</ul>'); inList = false; }
+        if(line.trim() !== '') out.push('<p>' + line + '</p>');
+      }
+    }
+    if(inList) out.push('</ul>');
+    return out.join('');
+  }
+
   async function getTransactions(){
     try{
       const res = await fetch('/api/transactions');
@@ -93,6 +148,7 @@
     insightBtn.textContent = 'Thinking...';
     insightOutput.textContent = 'Analyzing your transactions...';
     insightOutput.classList.remove('placeholder');
+    insightOutput.classList.add('insight-text');
     try{
       const transactions = await getTransactions();
       const res = await fetch('/api/ai/insights', {
@@ -101,7 +157,7 @@
         body: JSON.stringify({ transactions })
       });
       const data = await res.json();
-      insightOutput.textContent = data.insight || 'No insight returned.';
+      insightOutput.innerHTML = renderMarkdown(data.insight || 'No insight returned.');
     }catch(e){
       insightOutput.textContent = 'Something went wrong. Try again.';
     }
@@ -113,12 +169,20 @@
   const chatInput = document.getElementById('chat-input');
   const chatSend = document.getElementById('chat-send');
 
-  function addMsg(text, cls){
-    const div = document.createElement('div');
-    div.className = 'msg ' + cls;
-    div.textContent = text;
-    chatLog.appendChild(div);
+  function addMsg(text, role){
+    const row = document.createElement('div');
+    row.className = 'msg-row ' + role;
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble ' + role;
+    if(role === 'ai'){
+      bubble.innerHTML = renderMarkdown(text);
+    } else {
+      bubble.textContent = text;
+    }
+    row.appendChild(bubble);
+    chatLog.appendChild(row);
     chatLog.scrollTop = chatLog.scrollHeight;
+    return bubble;
   }
 
   async function sendChat(){
@@ -127,7 +191,7 @@
     addMsg(message, 'user');
     chatInput.value = '';
     chatSend.disabled = true;
-    addMsg('Thinking...', 'ai');
+    const thinkingBubble = addMsg('Thinking...', 'ai');
     try{
       const transactions = await getTransactions();
       const res = await fetch('/api/ai/chat', {
@@ -136,11 +200,12 @@
         body: JSON.stringify({ message, transactions })
       });
       const data = await res.json();
-      chatLog.lastChild.textContent = data.reply || 'No response.';
+      thinkingBubble.innerHTML = renderMarkdown(data.reply || 'No response.');
     }catch(e){
-      chatLog.lastChild.textContent = 'Something went wrong. Try again.';
+      thinkingBubble.textContent = 'Something went wrong. Try again.';
     }
     chatSend.disabled = false;
+    chatLog.scrollTop = chatLog.scrollHeight;
   }
 
   chatSend.addEventListener('click', sendChat);
