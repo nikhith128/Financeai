@@ -3,6 +3,8 @@ const express = require("express");
 const fs = require("fs");
 const path = require("path");
 
+const session = require('express-session');
+const authRoutes = require('./routes/auth');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -47,7 +49,14 @@ function generateId() {
 }
 
 app.use(express.json());
+app.use(session({
+  secret: 'change-this-to-a-random-string-later',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { maxAge: 1000 * 60 * 60 * 24 * 7 } // 7 days
+}));
 
+app.use('/api/auth', authRoutes);
 app.use(express.static(path.join(__dirname, "public")));
 const aiRoutes = require('./routes/ai');
 app.use('/api/ai', aiRoutes);

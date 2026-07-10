@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login — FinanceAI</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink-0:#0a0a0c; --ink-1:#131316; --ink-2:#1b1b1f;
+    --line: rgba(255,255,255,0.08);
+    --text-hi:#f2efe9; --text-lo:#8c8a86;
+    --gold:#d4af7a;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--ink-0); color:var(--text-hi);
+    font-family:'Inter', sans-serif; min-height:100vh;
+    display:flex; align-items:center; justify-content:center;
+    padding:24px;
+  }
+  .card{
+    width:100%; max-width:380px;
+    background: linear-gradient(180deg, var(--ink-2), var(--ink-1));
+    border:1px solid var(--line); border-radius:16px;
+    padding:32px 26px;
+  }
+  h1{ font-family:'Playfair Display', serif; font-size:26px; margin:0 0 6px; text-align:center; }
+  .sub{ color:var(--text-lo); font-size:13px; text-align:center; margin-bottom:24px; }
+
+  .tabs{ display:flex; margin-bottom:22px; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  .tab{ flex:1; text-align:center; padding:10px; font-size:13px; cursor:pointer; color:var(--text-lo); }
+  .tab.active{ background: var(--gold); color:#1a1a1a; font-weight:600; }
+
+  input{
+    width:100%; background: rgba(0,0,0,0.3); border:1px solid var(--line); color:var(--text-hi);
+    border-radius:10px; padding:12px 14px; font-size:14px; margin-bottom:12px; font-family:'Inter', sans-serif;
+  }
+  button{
+    width:100%; background: var(--gold); color:#1a1a1a; border:none;
+    padding:13px; border-radius:10px; font-weight:600; font-size:14px; cursor:pointer; margin-top:6px;
+  }
+  button:disabled{ opacity:0.5; }
+  .error{ color:#c97a6d; font-size:13px; margin-top:10px; text-align:center; min-height:16px; }
+</style>
+</head>
+<body>
+
+  <div class="card">
+    <h1>FinanceAI</h1>
+    <div class="sub">See your money, clearly.</div>
+
+    <div class="tabs">
+      <div class="tab active" id="tab-login">Log In</div>
+      <div class="tab" id="tab-signup">Sign Up</div>
+    </div>
+
+    <form id="auth-form">
+      <input type="text" id="username" placeholder="Username" required autocomplete="username">
+      <input type="password" id="password" placeholder="Password" required autocomplete="current-password">
+      <button type="submit" id="submit-btn">Log In</button>
+      <div class="error" id="error-msg"></div>
+    </form>
+  </div>
+
+<script>
+  let mode = 'login';
+  const tabLogin = document.getElementById('tab-login');
+  const tabSignup = document.getElementById('tab-signup');
+  const submitBtn = document.getElementById('submit-btn');
+  const errorMsg = document.getElementById('error-msg');
+  const form = document.getElementById('auth-form');
+
+  function setMode(newMode){
+    mode = newMode;
+    tabLogin.classList.toggle('active', mode === 'login');
+    tabSignup.classList.toggle('active', mode === 'signup');
+    submitBtn.textContent = mode === 'login' ? 'Log In' : 'Sign Up';
+    errorMsg.textContent = '';
+  }
+
+  tabLogin.addEventListener('click', () => setMode('login'));
+  tabSignup.addEventListener('click', () => setMode('signup'));
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    errorMsg.textContent = '';
+    submitBtn.disabled = true;
+
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value;
+
+    try{
+      const res = await fetch(`/api/auth/${mode}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if(!res.ok){
+        errorMsg.textContent = data.error || 'Something went wrong.';
+        submitBtn.disabled = false;
+        return;
+      }
+      window.location.href = '/dashboard.html';
+    }catch(err){
+      errorMsg.textContent = 'Could not connect. Try again.';
+      submitBtn.disabled = false;
+    }
+  });
+</script>
+
+</body>
+</html>
