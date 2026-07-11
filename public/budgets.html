@@ -18,6 +18,8 @@
     <a href="transactions.html">Transactions</a>
     <a href="budgets.html" class="active">Budgets &amp; Goals</a>
     <a href="analytics.html">Analytics</a>
+    <a href="/ai.html">AI Assistant</a>
+<a href="javascript:void(0)" onclick="logout()">Log Out</a>
     <a href="settings.html">Settings</a>
   </nav>
 
@@ -594,6 +596,18 @@
   // ---------- Init ----------
   renderAll();
 })();
+</script>
+  <script>
+  fetch('/api/auth/me')
+    .then(res => res.json())
+    .then(data => {
+      if (!data.loggedIn) {
+        window.location.href = '/login.html';
+      }
+    })
+    .catch(() => {
+      window.location.href = '/login.html';
+    });
 </script>
 </body>
 </html>
