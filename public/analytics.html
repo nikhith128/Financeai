@@ -19,7 +19,10 @@
     <a href="transactions.html">Transactions</a>
     <a href="budgets.html">Budgets &amp; Goals</a>
     <a href="analytics.html" class="active">Analytics</a>
+    <a href="/ai.html">AI Assistant</a>    
     <a href="settings.html">Settings</a>
+    <a href="javascript:void(0)" onclick="logout()">Log Out</a>
+
   </nav>
 
   <header>
@@ -523,5 +526,11 @@
   renderAll();
 })();
 </script>
+<script>
+  function logout(){
+    fetch('/api/auth/logout', { method: 'POST' })
+      .then(() => window.location.href = '/login.html');
+  }
+</script>  
 </body>
 </html>
