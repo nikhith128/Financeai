@@ -7,6 +7,18 @@
 <link rel="stylesheet" href="theme.css">
 </head>
 <body>
+  <script>
+  fetch('/api/auth/me')
+    .then(res => res.json())
+    .then(data => {
+      if (!data.loggedIn) {
+        window.location.href = '/login.html';
+      }
+    })
+    .catch(() => {
+      window.location.href = '/login.html';
+    });
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="three-bg.js"></script>
 <script src="card-tilt.js"></script>
@@ -19,8 +31,8 @@
     <a href="budgets.html" class="active">Budgets &amp; Goals</a>
     <a href="analytics.html">Analytics</a>
     <a href="/ai.html">AI Assistant</a>
-<a href="javascript:void(0)" onclick="logout()">Log Out</a>
     <a href="settings.html">Settings</a>
+    <a href="javascript:void(0)" onclick="logout()">Log Out</a>
   </nav>
 
   <header>
@@ -597,17 +609,11 @@
   renderAll();
 })();
 </script>
-  <script>
-  fetch('/api/auth/me')
-    .then(res => res.json())
-    .then(data => {
-      if (!data.loggedIn) {
-        window.location.href = '/login.html';
-      }
-    })
-    .catch(() => {
-      window.location.href = '/login.html';
-    });
+<script>
+  function logout(){
+    fetch('/api/auth/logout', { method: 'POST' })
+      .then(() => window.location.href = '/login.html');
+  }
 </script>
 </body>
 </html>
