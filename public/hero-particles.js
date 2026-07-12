@@ -74,8 +74,8 @@
   }
   var glowTexture = makeGlowTexture();
 
-  var isSmall = size.w < 700;
-  var COUNT = isSmall ? 1400 : 3200;
+var isSmall = size.w < 700;
+  var COUNT = isSmall ? 2400 : 4200;
 
   function diamondPoint() {
     var R = 7.2;
@@ -142,18 +142,18 @@
   geometry.setAttribute("position", new THREE.BufferAttribute(currentPositions, 3));
 
   var material = new THREE.PointsMaterial({
-    size: isSmall ? 0.16 : 0.13,
+    size: isSmall ? 0.32 : 0.22,
     map: glowTexture,
     transparent: true,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
-    color: 0xe9d3a8,
+    color: 0xf0dcae,
     sizeAttenuation: true,
-    opacity: 0.85
+    opacity: 1
   });
 
   var points = new THREE.Points(geometry, material);
-  points.position.set(0, -1.5, -4);
+  points.position.set(0, 0.2, -2.5);
   scene.add(points);
 
   var HOLD_DIAMOND = 4200;
