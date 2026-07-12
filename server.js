@@ -1,16 +1,13 @@
 require('dotenv').config();
 const express = require("express");
-const fs = require("fs");
 const path = require("path");
 const session = require('express-session');
+const { connectDB, getDB } = require('./db');
 const authRoutes = require('./routes/auth');
 const aiRoutes = require('./routes/ai');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-const DATA_DIR = path.join(__dirname, "data");
-const USERS_DATA_DIR = path.join(DATA_DIR, "user-data");
 
 const DEFAULT_BUDGETS = {
   Food: 6000,
@@ -23,47 +20,6 @@ const DEFAULT_BUDGETS = {
   Other: 1500
 };
 
-// ---------------- Per-user data file helpers ----------------
-
-function userDir(userId) {
-  return path.join(USERS_DATA_DIR, userId);
-}
-function userFiles(userId) {
-  const dir = userDir(userId);
-  return {
-    tx: path.join(dir, "transactions.json"),
-    budgets: path.join(dir, "budgets.json"),
-    goals: path.join(dir, "goals.json")
-  };
-}
-function ensureUserDataFiles(userId) {
-  const dir = userDir(userId);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  const files = userFiles(userId);
-  if (!fs.existsSync(files.tx)) fs.writeFileSync(files.tx, "[]");
-  if (!fs.existsSync(files.budgets)) fs.writeFileSync(files.budgets, JSON.stringify(DEFAULT_BUDGETS, null, 2));
-  if (!fs.existsSync(files.goals)) fs.writeFileSync(files.goals, "[]");
-  return files;
-}
-
-function ensureBaseDirs() {
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-  if (!fs.existsSync(USERS_DATA_DIR)) fs.mkdirSync(USERS_DATA_DIR, { recursive: true });
-}
-ensureBaseDirs();
-
-function readJSON(file, fallback) {
-  try {
-    const raw = fs.readFileSync(file, "utf-8");
-    return JSON.parse(raw);
-  } catch (e) {
-    console.error("Failed to read " + file, e);
-    return fallback;
-  }
-}
-function writeJSON(file, data) {
-  fs.writeFileSync(file, JSON.stringify(data, null, 2));
-}
 function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
@@ -82,8 +38,6 @@ function requireLogin(req, res, next) {
   if (!req.session.userId) {
     return res.status(401).json({ error: "Not logged in." });
   }
-  // make sure this user's data files exist, and attach paths to the request
-  req.userFiles = ensureUserDataFiles(req.session.userId);
   next();
 }
 
@@ -93,11 +47,15 @@ app.use('/api/ai', requireLogin, aiRoutes);
 
 // ---------------- Transactions ----------------
 
-app.get("/api/transactions", requireLogin, (req, res) => {
-  res.json(readJSON(req.userFiles.tx, []));
+app.get("/api/transactions", requireLogin, async (req, res) => {
+  const db = getDB();
+  const transactions = await db.collection('transactions')
+    .find({ userId: req.session.userId })
+    .toArray();
+  res.json(transactions);
 });
 
-app.post("/api/transactions", requireLogin, (req, res) => {
+app.post("/api/transactions", requireLogin, async (req, res) => {
   const body = req.body || {};
   if (typeof body.amount !== "number" || body.amount <= 0) {
     return res.status(400).json({ error: "amount must be a positive number" });
@@ -109,9 +67,9 @@ app.post("/api/transactions", requireLogin, (req, res) => {
     return res.status(400).json({ error: "date is required" });
   }
 
-  const transactions = readJSON(req.userFiles.tx, []);
   const tx = {
     id: generateId(),
+    userId: req.session.userId,
     type: body.type,
     amount: body.amount,
     date: body.date,
@@ -120,23 +78,22 @@ app.post("/api/transactions", requireLogin, (req, res) => {
     category: body.category || null,
     note: body.note || ""
   };
-  transactions.push(tx);
-  writeJSON(req.userFiles.tx, transactions);
+  const db = getDB();
+  await db.collection('transactions').insertOne(tx);
   res.status(201).json(tx);
 });
 
-app.put("/api/transactions/:id", requireLogin, (req, res) => {
-  const transactions = readJSON(req.userFiles.tx, []);
-  const idx = transactions.findIndex((t) => t.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: "transaction not found" });
+app.put("/api/transactions/:id", requireLogin, async (req, res) => {
+  const db = getDB();
+  const existing = await db.collection('transactions').findOne({ id: req.params.id, userId: req.session.userId });
+  if (!existing) return res.status(404).json({ error: "transaction not found" });
 
   const body = req.body || {};
   if (typeof body.amount !== "number" || body.amount <= 0) {
     return res.status(400).json({ error: "amount must be a positive number" });
   }
 
-  transactions[idx] = {
-    id: transactions[idx].id,
+  const updated = {
     type: body.type,
     amount: body.amount,
     date: body.date,
@@ -145,86 +102,97 @@ app.put("/api/transactions/:id", requireLogin, (req, res) => {
     category: body.category || null,
     note: body.note || ""
   };
-  writeJSON(req.userFiles.tx, transactions);
-  res.json(transactions[idx]);
+  await db.collection('transactions').updateOne(
+    { id: req.params.id, userId: req.session.userId },
+    { $set: updated }
+  );
+  res.json({ id: req.params.id, userId: req.session.userId, ...updated });
 });
 
-app.delete("/api/transactions/:id", requireLogin, (req, res) => {
-  let transactions = readJSON(req.userFiles.tx, []);
-  const exists = transactions.some((t) => t.id === req.params.id);
-  if (!exists) return res.status(404).json({ error: "transaction not found" });
-  transactions = transactions.filter((t) => t.id !== req.params.id);
-  writeJSON(req.userFiles.tx, transactions);
+app.delete("/api/transactions/:id", requireLogin, async (req, res) => {
+  const db = getDB();
+  const result = await db.collection('transactions').deleteOne({ id: req.params.id, userId: req.session.userId });
+  if (result.deletedCount === 0) return res.status(404).json({ error: "transaction not found" });
   res.status(204).send();
 });
 
 // ---------------- Budgets ----------------
 
-app.get("/api/budgets", requireLogin, (req, res) => {
-  res.json(readJSON(req.userFiles.budgets, DEFAULT_BUDGETS));
+app.get("/api/budgets", requireLogin, async (req, res) => {
+  const db = getDB();
+  const doc = await db.collection('budgets').findOne({ userId: req.session.userId });
+  res.json(doc ? doc.budgets : DEFAULT_BUDGETS);
 });
 
-app.put("/api/budgets/:category", requireLogin, (req, res) => {
-  const budgets = readJSON(req.userFiles.budgets, {});
+app.put("/api/budgets/:category", requireLogin, async (req, res) => {
   const limit = req.body ? req.body.limit : undefined;
   if (typeof limit !== "number" || limit < 0) {
     return res.status(400).json({ error: "limit must be a number >= 0" });
   }
+  const db = getDB();
+  const doc = await db.collection('budgets').findOne({ userId: req.session.userId });
+  const budgets = doc ? doc.budgets : { ...DEFAULT_BUDGETS };
   budgets[req.params.category] = limit;
-  writeJSON(req.userFiles.budgets, budgets);
+
+  await db.collection('budgets').updateOne(
+    { userId: req.session.userId },
+    { $set: { userId: req.session.userId, budgets } },
+    { upsert: true }
+  );
   res.json(budgets);
 });
 
 // ---------------- Goals ----------------
 
-app.get("/api/goals", requireLogin, (req, res) => {
-  res.json(readJSON(req.userFiles.goals, []));
+app.get("/api/goals", requireLogin, async (req, res) => {
+  const db = getDB();
+  const goals = await db.collection('goals').find({ userId: req.session.userId }).toArray();
+  res.json(goals);
 });
 
-app.post("/api/goals", requireLogin, (req, res) => {
+app.post("/api/goals", requireLogin, async (req, res) => {
   const body = req.body || {};
   if (!body.title || typeof body.targetAmount !== "number" || body.targetAmount <= 0 || !body.targetDate) {
     return res.status(400).json({ error: "title, targetAmount (>0), and targetDate are required" });
   }
-  const goals = readJSON(req.userFiles.goals, []);
   const goal = {
     id: generateId(),
+    userId: req.session.userId,
     title: body.title,
     targetAmount: body.targetAmount,
     targetDate: body.targetDate,
     savedAmount: 0
   };
-  goals.push(goal);
-  writeJSON(req.userFiles.goals, goals);
+  const db = getDB();
+  await db.collection('goals').insertOne(goal);
   res.status(201).json(goal);
 });
 
-app.put("/api/goals/:id", requireLogin, (req, res) => {
-  const goals = readJSON(req.userFiles.goals, []);
-  const idx = goals.findIndex((g) => g.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: "goal not found" });
+app.put("/api/goals/:id", requireLogin, async (req, res) => {
+  const db = getDB();
+  const existing = await db.collection('goals').findOne({ id: req.params.id, userId: req.session.userId });
+  if (!existing) return res.status(404).json({ error: "goal not found" });
 
   const body = req.body || {};
   if (!body.title || typeof body.targetAmount !== "number" || body.targetAmount <= 0 || !body.targetDate) {
     return res.status(400).json({ error: "title, targetAmount (>0), and targetDate are required" });
   }
-  goals[idx].title = body.title;
-  goals[idx].targetAmount = body.targetAmount;
-  goals[idx].targetDate = body.targetDate;
-  writeJSON(req.userFiles.goals, goals);
-  res.json(goals[idx]);
+  await db.collection('goals').updateOne(
+    { id: req.params.id, userId: req.session.userId },
+    { $set: { title: body.title, targetAmount: body.targetAmount, targetDate: body.targetDate } }
+  );
+  const updated = await db.collection('goals').findOne({ id: req.params.id, userId: req.session.userId });
+  res.json(updated);
 });
 
-app.delete("/api/goals/:id", requireLogin, (req, res) => {
-  let goals = readJSON(req.userFiles.goals, []);
-  const exists = goals.some((g) => g.id === req.params.id);
-  if (!exists) return res.status(404).json({ error: "goal not found" });
-  goals = goals.filter((g) => g.id !== req.params.id);
-  writeJSON(req.userFiles.goals, goals);
+app.delete("/api/goals/:id", requireLogin, async (req, res) => {
+  const db = getDB();
+  const result = await db.collection('goals').deleteOne({ id: req.params.id, userId: req.session.userId });
+  if (result.deletedCount === 0) return res.status(404).json({ error: "goal not found" });
   res.status(204).send();
 });
 
-app.post("/api/goals/:id/contribute", requireLogin, (req, res) => {
+app.post("/api/goals/:id/contribute", requireLogin, async (req, res) => {
   const body = req.body || {};
   const amount = body.amount;
   const account = body.account;
@@ -236,59 +204,89 @@ app.post("/api/goals/:id/contribute", requireLogin, (req, res) => {
     return res.status(400).json({ error: "account is required" });
   }
 
-  const goals = readJSON(req.userFiles.goals, []);
-  const idx = goals.findIndex((g) => g.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: "goal not found" });
+  const db = getDB();
+  const goal = await db.collection('goals').findOne({ id: req.params.id, userId: req.session.userId });
+  if (!goal) return res.status(404).json({ error: "goal not found" });
 
-  goals[idx].savedAmount += amount;
-  writeJSON(req.userFiles.goals, goals);
+  const newSavedAmount = goal.savedAmount + amount;
+  await db.collection('goals').updateOne(
+    { id: req.params.id, userId: req.session.userId },
+    { $set: { savedAmount: newSavedAmount } }
+  );
 
-  const transactions = readJSON(req.userFiles.tx, []);
   const tx = {
     id: generateId(),
+    userId: req.session.userId,
     type: "transfer",
     amount: amount,
     date: new Date().toISOString(),
     account: account,
-    toAccount: "Goal: " + goals[idx].title,
+    toAccount: "Goal: " + goal.title,
     category: null,
-    note: "Contribution to goal: " + goals[idx].title
+    note: "Contribution to goal: " + goal.title
   };
-  transactions.push(tx);
-  writeJSON(req.userFiles.tx, transactions);
+  await db.collection('transactions').insertOne(tx);
 
-  res.json({ goal: goals[idx], transaction: tx });
+  const updatedGoal = await db.collection('goals').findOne({ id: req.params.id, userId: req.session.userId });
+  res.json({ goal: updatedGoal, transaction: tx });
 });
 
 // ---------------- Backup / Restore ----------------
 
-app.get("/api/backup", requireLogin, (req, res) => {
+app.get("/api/backup", requireLogin, async (req, res) => {
+  const db = getDB();
+  const transactions = await db.collection('transactions').find({ userId: req.session.userId }).toArray();
+  const budgetsDoc = await db.collection('budgets').findOne({ userId: req.session.userId });
+  const goals = await db.collection('goals').find({ userId: req.session.userId }).toArray();
   res.json({
     exportedAt: new Date().toISOString(),
-    transactions: readJSON(req.userFiles.tx, []),
-    budgets: readJSON(req.userFiles.budgets, DEFAULT_BUDGETS),
-    goals: readJSON(req.userFiles.goals, [])
+    transactions,
+    budgets: budgetsDoc ? budgetsDoc.budgets : DEFAULT_BUDGETS,
+    goals
   });
 });
 
-app.post("/api/backup/restore", requireLogin, (req, res) => {
+app.post("/api/backup/restore", requireLogin, async (req, res) => {
   const body = req.body || {};
   if (!Array.isArray(body.transactions) || typeof body.budgets !== "object" || body.budgets === null || !Array.isArray(body.goals)) {
     return res.status(400).json({ error: "backup file must include transactions (array), budgets (object), and goals (array)" });
   }
-  writeJSON(req.userFiles.tx, body.transactions);
-  writeJSON(req.userFiles.budgets, body.budgets);
-  writeJSON(req.userFiles.goals, body.goals);
+  const db = getDB();
+  const userId = req.session.userId;
+
+  await db.collection('transactions').deleteMany({ userId });
+  const txWithUser = body.transactions.map(t => ({ ...t, userId }));
+  if (txWithUser.length > 0) await db.collection('transactions').insertMany(txWithUser);
+
+  await db.collection('budgets').updateOne(
+    { userId },
+    { $set: { userId, budgets: body.budgets } },
+    { upsert: true }
+  );
+
+  await db.collection('goals').deleteMany({ userId });
+  const goalsWithUser = body.goals.map(g => ({ ...g, userId }));
+  if (goalsWithUser.length > 0) await db.collection('goals').insertMany(goalsWithUser);
+
   res.json({ success: true });
 });
 
-app.delete("/api/backup", requireLogin, (req, res) => {
-  writeJSON(req.userFiles.tx, []);
-  writeJSON(req.userFiles.budgets, DEFAULT_BUDGETS);
-  writeJSON(req.userFiles.goals, []);
+app.delete("/api/backup", requireLogin, async (req, res) => {
+  const db = getDB();
+  const userId = req.session.userId;
+  await db.collection('transactions').deleteMany({ userId });
+  await db.collection('budgets').updateOne({ userId }, { $set: { userId, budgets: DEFAULT_BUDGETS } }, { upsert: true });
+  await db.collection('goals').deleteMany({ userId });
   res.json({ success: true });
 });
 
-app.listen(PORT, () => {
-  console.log("FinanceAI backend running at http://localhost:" + PORT);
-});
+// ---------------- Start server (connect DB first) ----------------
+
+async function start() {
+  await connectDB();
+  app.listen(PORT, () => {
+    console.log("FinanceAI backend running at http://localhost:" + PORT);
+  });
+}
+
+start();

@@ -10,6 +10,7 @@
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.4.2",
     "express": "^4.19.2",
-    "express-session": "^1.19.0"
+    "express-session": "^1.19.0",
+    "mongodb": "^7.5.0"
   }
 }
