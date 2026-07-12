@@ -7,6 +7,8 @@
 (function () {
   "use strict";
 
+  document.addEventListener("DOMContentLoaded", function () {
+
   if (typeof THREE === "undefined") {
     console.warn("Three.js not loaded — skipping hero particle diamond.");
     return;
@@ -214,5 +216,6 @@
     camera.updateProjectionMatrix();
     renderer.setSize(s.w, s.h);
   });
-})();
 
+  }); // end DOMContentLoaded
+})();
