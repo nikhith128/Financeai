@@ -7,6 +7,16 @@
 <link rel="icon" href="favicon.ico">
 <link rel="stylesheet" href="theme.css">
 <style>
+  .hero-text-vignette {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse 60% 55% at center, rgba(10,10,12,0.72) 0%, rgba(10,10,12,0.35) 45%, transparent 75%);
+}
+.hero-eyebrow, .hero h1, .hero-sub {
+  text-shadow: 0 2px 12px rgba(0,0,0,0.8);
+}
   /* ---------------- Landing page only ---------------- */
   body { padding: 0; }
   .landing-nav {
@@ -109,6 +119,7 @@
 </nav>
 
 <section class="hero">
+  <div class="hero-text-vignette"></div>
   <div class="hero-eyebrow">Personal Finance, Reimagined</div>
   <h1>See your money,<br><span class="accent">clearly.</span></h1>
   <p class="hero-sub">
