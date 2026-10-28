@@ -153,10 +153,11 @@
   }
 
   async function getTransactions(){
-    try{
-      const res = await fetch('/api/transactions');
-      return await res.json();
-    }catch(e){ return []; }
+    const res = await fetch('/api/transactions');
+    if (!res.ok) throw new Error('Could not load transactions.');
+    const transactions = await res.json();
+    if (!Array.isArray(transactions)) throw new Error('Unexpected transactions response.');
+    return transactions;
   }
 
   const insightBtn = document.getElementById('insight-btn');
@@ -175,6 +176,7 @@
         body: JSON.stringify({ transactions })
       });
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not generate insights.');
       insightOutput.innerHTML = renderMarkdown(data.insight || 'No insight returned.');
     }catch(e){
       insightOutput.textContent = 'Something went wrong. Try again.';
@@ -218,6 +220,7 @@
         body: JSON.stringify({ message, transactions })
       });
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not get a reply.');
       thinkingBubble.innerHTML = renderMarkdown(data.reply || 'No response.');
     }catch(e){
       thinkingBubble.textContent = 'Something went wrong. Try again.';
