@@ -7,26 +7,32 @@ function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
+function escapeRegex(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // Sign up
 router.post('/signup', async (req, res) => {
   try {
-    const { username, password } = req.body;
-    if (!username || !password) {
+    const { username, password } = req.body || {};
+    if (typeof username !== 'string' || !username.trim() || username.length > 64 ||
+        typeof password !== 'string' || !password) {
       return res.status(400).json({ error: 'Username and password required.' });
     }
+    const safeUsername = username.trim();
 
     const db = getDB();
     const users = db.collection('users');
 
     const existing = await users.findOne({
-      username: { $regex: `^${username}$`, $options: 'i' }
+      username: { $regex: `^${escapeRegex(safeUsername)}$`, $options: 'i' }
     });
     if (existing) {
       return res.status(400).json({ error: 'That username is already taken.' });
     }
 
     const hashed = await bcrypt.hash(password, 10);
-    const newUser = { id: generateId(), username, password: hashed };
+    const newUser = { id: generateId(), username: safeUsername, password: hashed };
     await users.insertOne(newUser);
 
     req.session.userId = newUser.id;
@@ -41,12 +47,15 @@ router.post('/signup', async (req, res) => {
 // Log in
 router.post('/login', async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, password } = req.body || {};
+    if (typeof username !== 'string' || typeof password !== 'string') {
+      return res.status(401).json({ error: 'Invalid username or password.' });
+    }
     const db = getDB();
     const users = db.collection('users');
 
     const user = await users.findOne({
-      username: { $regex: `^${username || ''}$`, $options: 'i' }
+      username: { $regex: `^${escapeRegex(username.trim())}$`, $options: 'i' }
     });
     if (!user) {
       return res.status(401).json({ error: 'Invalid username or password.' });

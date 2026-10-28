@@ -2,12 +2,15 @@ require('dotenv').config();
 const express = require("express");
 const path = require("path");
 const session = require('express-session');
-const { connectDB, getDB } = require('./db');
+const { connectDB, getDB, MongoSessionStore } = require('./db');
 const authRoutes = require('./routes/auth');
 const aiRoutes = require('./routes/ai');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
+  throw new Error('SESSION_SECRET is required in production.');
+}
 
 const DEFAULT_BUDGETS = {
   Food: 6000,
@@ -27,11 +30,13 @@ function generateId() {
 // ---------------- Middleware ----------------
 
 app.use(express.json());
+app.set('trust proxy', 1);
 app.use(session({
   secret: process.env.SESSION_SECRET || 'dev-only-fallback-secret-change-me',
+  store: new MongoSessionStore(),
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 1000 * 60 * 60 * 24 * 7 } // 7 days
+  cookie: { maxAge: 1000 * 60 * 60 * 24 * 7, httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production' } // 7 days
 }));
 
 function requireLogin(req, res, next) {
@@ -57,16 +62,15 @@ app.get("/api/transactions", requireLogin, async (req, res) => {
 
 app.post("/api/transactions", requireLogin, async (req, res) => {
   const body = req.body || {};
-  if (typeof body.amount !== "number" || body.amount <= 0) {
+  if (typeof body.amount !== "number" || !Number.isFinite(body.amount) || body.amount <= 0) {
     return res.status(400).json({ error: "amount must be a positive number" });
   }
-  if (["income", "expense", "transfer"].indexOf(body.type) === -1) {
+  if (!["income", "expense", "transfer"].includes(body.type)) {
     return res.status(400).json({ error: "type must be income, expense, or transfer" });
   }
-  if (!body.date) {
-    return res.status(400).json({ error: "date is required" });
+  if (typeof body.date !== "string" || !Number.isFinite(Date.parse(body.date))) {
+    return res.status(400).json({ error: "date must be a valid date" });
   }
-
   const tx = {
     id: generateId(),
     userId: req.session.userId,
@@ -89,8 +93,14 @@ app.put("/api/transactions/:id", requireLogin, async (req, res) => {
   if (!existing) return res.status(404).json({ error: "transaction not found" });
 
   const body = req.body || {};
-  if (typeof body.amount !== "number" || body.amount <= 0) {
+  if (typeof body.amount !== "number" || !Number.isFinite(body.amount) || body.amount <= 0) {
     return res.status(400).json({ error: "amount must be a positive number" });
+  }
+  if (!["income", "expense", "transfer"].includes(body.type)) {
+    return res.status(400).json({ error: "type must be income, expense, or transfer" });
+  }
+  if (typeof body.date !== "string" || !Number.isFinite(Date.parse(body.date))) {
+    return res.status(400).json({ error: "date must be a valid date" });
   }
 
   const updated = {
@@ -208,11 +218,11 @@ app.post("/api/goals/:id/contribute", requireLogin, async (req, res) => {
   const goal = await db.collection('goals').findOne({ id: req.params.id, userId: req.session.userId });
   if (!goal) return res.status(404).json({ error: "goal not found" });
 
-  const newSavedAmount = goal.savedAmount + amount;
-  await db.collection('goals').updateOne(
+  const goalUpdate = await db.collection('goals').updateOne(
     { id: req.params.id, userId: req.session.userId },
-    { $set: { savedAmount: newSavedAmount } }
+    { $inc: { savedAmount: amount } }
   );
+  if (!goalUpdate.matchedCount) return res.status(404).json({ error: "goal not found" });
 
   const tx = {
     id: generateId(),
@@ -225,7 +235,15 @@ app.post("/api/goals/:id/contribute", requireLogin, async (req, res) => {
     category: null,
     note: "Contribution to goal: " + goal.title
   };
-  await db.collection('transactions').insertOne(tx);
+  try {
+    await db.collection('transactions').insertOne(tx);
+  } catch (err) {
+    await db.collection('goals').updateOne(
+      { id: req.params.id, userId: req.session.userId },
+      { $inc: { savedAmount: -amount } }
+    );
+    throw err;
+  }
 
   const updatedGoal = await db.collection('goals').findOne({ id: req.params.id, userId: req.session.userId });
   res.json({ goal: updatedGoal, transaction: tx });
@@ -248,14 +266,26 @@ app.get("/api/backup", requireLogin, async (req, res) => {
 
 app.post("/api/backup/restore", requireLogin, async (req, res) => {
   const body = req.body || {};
-  if (!Array.isArray(body.transactions) || typeof body.budgets !== "object" || body.budgets === null || !Array.isArray(body.goals)) {
+  const validTransaction = (t) => t && typeof t === 'object' && !Array.isArray(t) &&
+    typeof t.id === 'string' && ['income', 'expense', 'transfer'].includes(t.type) &&
+    typeof t.amount === 'number' && Number.isFinite(t.amount) && t.amount > 0 &&
+    typeof t.date === 'string' && Number.isFinite(Date.parse(t.date));
+  const validGoal = (g) => g && typeof g === 'object' && !Array.isArray(g) &&
+    typeof g.id === 'string' && typeof g.title === 'string' &&
+    typeof g.targetAmount === 'number' && Number.isFinite(g.targetAmount) && g.targetAmount > 0 &&
+    typeof g.savedAmount === 'number' && Number.isFinite(g.savedAmount) && g.savedAmount >= 0 &&
+    typeof g.targetDate === 'string' && Number.isFinite(Date.parse(g.targetDate));
+  const validBudgets = body.budgets && typeof body.budgets === 'object' && !Array.isArray(body.budgets) &&
+    Object.values(body.budgets).every((v) => typeof v === 'number' && Number.isFinite(v) && v >= 0);
+  if (!Array.isArray(body.transactions) || !body.transactions.every(validTransaction) || !validBudgets ||
+      !Array.isArray(body.goals) || !body.goals.every(validGoal)) {
     return res.status(400).json({ error: "backup file must include transactions (array), budgets (object), and goals (array)" });
   }
   const db = getDB();
   const userId = req.session.userId;
 
   await db.collection('transactions').deleteMany({ userId });
-  const txWithUser = body.transactions.map(t => ({ ...t, userId }));
+  const txWithUser = body.transactions.map(({ _id, userId: _userId, ...t }) => ({ ...t, userId }));
   if (txWithUser.length > 0) await db.collection('transactions').insertMany(txWithUser);
 
   await db.collection('budgets').updateOne(
@@ -265,7 +295,7 @@ app.post("/api/backup/restore", requireLogin, async (req, res) => {
   );
 
   await db.collection('goals').deleteMany({ userId });
-  const goalsWithUser = body.goals.map(g => ({ ...g, userId }));
+  const goalsWithUser = body.goals.map(({ _id, userId: _userId, ...g }) => ({ ...g, userId }));
   if (goalsWithUser.length > 0) await db.collection('goals').insertMany(goalsWithUser);
 
   res.json({ success: true });
